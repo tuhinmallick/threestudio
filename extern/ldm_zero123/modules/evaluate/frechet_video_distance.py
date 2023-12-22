@@ -47,8 +47,7 @@ def preprocess(videos, target_resolution):
     resized_videos = tf.image.resize_bilinear(all_frames, size=target_resolution)
     target_shape = [videos_shape[0], -1] + list(target_resolution) + [3]
     output_videos = tf.reshape(resized_videos, target_shape)
-    scaled_videos = 2.0 * tf.cast(output_videos, tf.float32) / 255.0 - 1
-    return scaled_videos
+    return 2.0 * tf.cast(output_videos, tf.float32) / 255.0 - 1
 
 
 def _is_in_graph(tensor_name):
@@ -78,9 +77,6 @@ def create_id3_embedding(videos, warmup=False, batch_size=16):
       ValueError: when a provided embedding_layer is not supported.
     """
 
-    # batch_size = 16
-    module_spec = "https://tfhub.dev/deepmind/i3d-kinetics-400/1"
-
     # Making sure that we import the graph separately for
     # each different input video tensor.
     module_name = "fvd_kinetics-400_id3_module_" + six.ensure_str(videos.name).replace(
@@ -104,7 +100,7 @@ def create_id3_embedding(videos, warmup=False, batch_size=16):
     with tf.control_dependencies(assert_ops):
         videos = tf.identity(videos)
 
-    module_scope = "%s_apply_default/" % module_name
+    module_scope = f"{module_name}_apply_default/"
 
     # To check whether the module has already been loaded into the graph, we look
     # for a given tensor name. If this tensor name exists, we assume the function
@@ -121,15 +117,17 @@ def create_id3_embedding(videos, warmup=False, batch_size=16):
             -1,
             None,
         ], f"Invalid batch size {video_batch_size}"
-    tensor_name = module_scope + "RGB/inception_i3d/Mean:0"
+    tensor_name = f"{module_scope}RGB/inception_i3d/Mean:0"
     if not _is_in_graph(tensor_name):
+        # batch_size = 16
+        module_spec = "https://tfhub.dev/deepmind/i3d-kinetics-400/1"
+
         i3d_model = hub.Module(module_spec, name=module_name)
         i3d_model(videos)
 
     # gets the kinetics-i3d-400-logits layer
-    tensor_name = module_scope + "RGB/inception_i3d/Mean:0"
-    tensor = tf.get_default_graph().get_tensor_by_name(tensor_name)
-    return tensor
+    tensor_name = f"{module_scope}RGB/inception_i3d/Mean:0"
+    return tf.get_default_graph().get_tensor_by_name(tensor_name)
 
 
 def calculate_fvd(real_activations, generated_activations):

@@ -83,7 +83,7 @@ class Control4D(BaseLift3DSystem):
         if self.per_editing_step > 0 and self.global_step > self.start_editing_step:
             prompt_utils = self.prompt_processor()
             if (
-                not batch_index in self.edit_frames
+                batch_index not in self.edit_frames
                 or self.global_step % self.per_editing_step == 0
             ):
                 result = self.guidance(out["comp_gan_rgb"], origin_gt_rgb, prompt_utils)

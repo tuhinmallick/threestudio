@@ -53,7 +53,7 @@ class PerceptualLoss(nn.Module):
         self.load_state_dict(
             torch.load(ckpt, map_location=torch.device("cpu")), strict=False
         )
-        print("loaded pretrained LPIPS loss from {}".format(ckpt))
+        print(f"loaded pretrained LPIPS loss from {ckpt}")
 
     @classmethod
     def from_pretrained(cls, name="vgg_lpips"):
@@ -157,8 +157,7 @@ class vgg16(torch.nn.Module):
         vgg_outputs = namedtuple(
             "VggOutputs", ["relu1_2", "relu2_2", "relu3_3", "relu4_3", "relu5_3"]
         )
-        out = vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3, h_relu5_3)
-        return out
+        return vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3, h_relu5_3)
 
 
 def normalize_tensor(x, eps=1e-10):

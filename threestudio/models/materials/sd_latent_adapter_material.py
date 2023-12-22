@@ -38,5 +38,4 @@ class StableDiffusionLatentAdapterMaterial(BaseMaterial):
         assert features.shape[-1] == 4
         color = features @ self.adapter
         color = (color + 1) / 2
-        color = color.clamp(0.0, 1.0)
-        return color
+        return color.clamp(0.0, 1.0)

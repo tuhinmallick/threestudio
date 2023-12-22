@@ -23,10 +23,9 @@ def gaussian(window_size, sigma):
 def create_window(window_size, channel):
     _1D_window = gaussian(window_size, 1.5).unsqueeze(1)
     _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
-    window = Variable(
+    return Variable(
         _2D_window.expand(channel, 1, window_size, window_size).contiguous()
     )
-    return window
 
 
 def _ssim(img1, img2, window, window_size, channel, mask=None, size_average=True):
@@ -55,7 +54,7 @@ def _ssim(img1, img2, window, window_size, channel, mask=None, size_average=True
         (mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2)
     )
 
-    if not (mask is None):
+    if mask is not None:
         b = mask.size(0)
         ssim_map = ssim_map.mean(dim=1, keepdim=True) * mask
         ssim_map = ssim_map.view(b, -1).sum(dim=1) / mask.view(b, -1).sum(dim=1).clamp(
@@ -67,10 +66,7 @@ def _ssim(img1, img2, window, window_size, channel, mask=None, size_average=True
 
     pdb.set_trace
 
-    if size_average:
-        return ssim_map.mean()
-    else:
-        return ssim_map.mean(1).mean(1).mean(1)
+    return ssim_map.mean() if size_average else ssim_map.mean(1).mean(1).mean(1)
 
 
 class SSIM(torch.nn.Module):

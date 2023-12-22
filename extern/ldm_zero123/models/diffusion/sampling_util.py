@@ -36,8 +36,7 @@ def renorm_thresholding(x0, value):
 
     # re.renorm
     pred_x0 = (pred_x0 + 1.0) / 2.0  # 0 ... 1
-    pred_x0 = (pred_max - pred_min) * pred_x0 + pred_min  # orig range
-    return pred_x0
+    return (pred_max - pred_min) * pred_x0 + pred_min
 
 
 def norm_thresholding(x0, value):

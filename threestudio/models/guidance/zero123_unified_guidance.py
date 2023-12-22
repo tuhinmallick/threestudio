@@ -82,7 +82,7 @@ class Zero123UnifiedGuidance(BaseModule):
             torch.float16 if self.cfg.half_precision_weights else torch.float32
         )
 
-        threestudio.info(f"Loading Zero123 ...")
+        threestudio.info("Loading Zero123 ...")
 
         # need to make sure the pipeline file is in path
         sys.path.append("extern/")
@@ -169,7 +169,7 @@ class Zero123UnifiedGuidance(BaseModule):
                 self.lora_layers._load_state_dict_pre_hooks.clear()
                 self.lora_layers._state_dict_hooks.clear()
 
-        threestudio.info(f"Loaded Stable Diffusion!")
+        threestudio.info("Loaded Stable Diffusion!")
 
         self.scheduler = DDPMScheduler.from_config(pipe.scheduler.config)
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
@@ -272,7 +272,7 @@ class Zero123UnifiedGuidance(BaseModule):
             dim=-1,
         )[:, None, :]
 
-        image_camera_embeddings = self.pipe.clip_camera_projection(
+        return self.pipe.clip_camera_projection(
             torch.cat(
                 [
                     self.clip_image_embeddings.repeat(batch_size, 1, 1),
@@ -281,8 +281,6 @@ class Zero123UnifiedGuidance(BaseModule):
                 dim=-1,
             ).to(self.weights_dtype)
         )
-
-        return image_camera_embeddings
 
     @torch.cuda.amp.autocast(enabled=False)
     def forward_unet(
@@ -320,10 +318,7 @@ class Zero123UnifiedGuidance(BaseModule):
         # expect input in [-1, 1]
         input_dtype = imgs.dtype
         posterior = vae.encode(imgs.to(vae.dtype)).latent_dist
-        if mode:
-            latents = posterior.mode()
-        else:
-            latents = posterior.sample()
+        latents = posterior.mode() if mode else posterior.sample()
         latents = latents * vae.config.scaling_factor
         return latents.to(input_dtype)
 
@@ -333,7 +328,7 @@ class Zero123UnifiedGuidance(BaseModule):
     ) -> Float[Tensor, "B 3 H W"]:
         # output in [0, 1]
         input_dtype = latents.dtype
-        latents = 1 / vae.config.scaling_factor * latents
+        latents *= 1 / vae.config.scaling_factor
         image = vae.decode(latents.to(vae.dtype)).sample
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
@@ -655,7 +650,7 @@ class Zero123UnifiedGuidance(BaseModule):
                 rgb_1step_orig = self.vae_decode(
                     self.pipe.vae, latents_1step_orig
                 ).permute(0, 2, 3, 1)
-            guidance_out.update({"rgb_1step_orig": rgb_1step_orig})
+            guidance_out["rgb_1step_orig"] = rgb_1step_orig
 
         if self.cfg.return_rgb_multistep_orig:
             with self.set_scheduler(
@@ -693,11 +688,7 @@ class Zero123UnifiedGuidance(BaseModule):
             )
 
         if self.cfg.guidance_type == "vsd":
-            guidance_out.update(
-                {
-                    "loss_train_phi": loss_train_phi,
-                }
-            )
+            guidance_out["loss_train_phi"] = loss_train_phi
 
         return guidance_out
 

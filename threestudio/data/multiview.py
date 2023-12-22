@@ -123,6 +123,8 @@ class MultiviewIterableDataset(IterableDataset):
                 f"Unknown camera layout {self.cfg.camera_layout}. Now support only around and front."
             )
 
+        near = 0.1
+        far = 1000.0
         for idx, frame in tqdm(enumerate(frames)):
             intrinsic: Float[Tensor, "4 4"] = torch.eye(4)
             intrinsic[0, 0] = frame["fl_x"] / scale
@@ -147,8 +149,6 @@ class MultiviewIterableDataset(IterableDataset):
             c2w = c2w_list[idx]
             camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
 
-            near = 0.1
-            far = 1000.0
             proj = convert_proj(intrinsic, self.frame_h, self.frame_w, near, far)
             proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
             frames_proj.append(proj)
@@ -248,7 +248,9 @@ class MultiviewDataset(Dataset):
                 f"Unknown camera layout {self.cfg.camera_layout}. Now support only around and front."
             )
 
-        if not (self.cfg.eval_interpolation is None):
+        near = 0.1
+        far = 1000.0
+        if self.cfg.eval_interpolation is not None:
             idx0 = self.cfg.eval_interpolation[0]
             idx1 = self.cfg.eval_interpolation[1]
             eval_nums = self.cfg.eval_interpolation[2]
@@ -276,8 +278,6 @@ class MultiviewDataset(Dataset):
                 )
                 camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
 
-                near = 0.1
-                far = 1000.0
                 proj = convert_proj(intrinsic, self.frame_h, self.frame_w, near, far)
                 proj: Float[Tensor, "4 4"] = torch.FloatTensor(proj)
                 frames_proj.append(proj)
@@ -309,8 +309,6 @@ class MultiviewDataset(Dataset):
                 c2w = c2w_list[idx]
                 camera_position: Float[Tensor, "3"] = c2w[:3, 3:].reshape(-1)
 
-                near = 0.1
-                far = 1000.0
                 K = intrinsic
                 proj = [
                     [

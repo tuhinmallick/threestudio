@@ -44,7 +44,7 @@ def _load_16big_png_depth(depth_png) -> np.ndarray:
 
 def _load_depth(path, scale_adjustment) -> np.ndarray:
     if not path.lower().endswith(".png"):
-        raise ValueError('unsupported depth file name "%s"' % path)
+        raise ValueError(f'unsupported depth file name "{path}"')
 
     d = _load_16big_png_depth(path) * scale_adjustment
     d[~np.isfinite(d)] = 0.0
@@ -91,7 +91,7 @@ def get_clamp_bbox(bbox, box_crop_context=0.0, impath=""):
 
     # bbox[2:] = np.clip(bbox[2:], 2, )
     bbox[2:] = np.maximum(bbox[2:], 2)
-    bbox[2:] += bbox[0:2] + 1  # convert to [xmin, ymin, xmax, ymax]
+    bbox[2:] += bbox[:2] + 1
     # +1 because upper bound is not inclusive
 
     return bbox

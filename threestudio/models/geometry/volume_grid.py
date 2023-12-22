@@ -98,10 +98,10 @@ class VolumeGrid(BaseImplicitGeometry):
         }
 
         if output_normal:
-            if (
-                self.cfg.normal_type == "finite_difference"
-                or self.cfg.normal_type == "finite_difference_laplacian"
-            ):
+            if self.cfg.normal_type in [
+                "finite_difference",
+                "finite_difference_laplacian",
+            ]:
                 eps = 1.0e-3
                 if self.cfg.normal_type == "finite_difference_laplacian":
                     offsets: Float[Tensor, "6 3"] = torch.as_tensor(
@@ -182,9 +182,5 @@ class VolumeGrid(BaseImplicitGeometry):
         points = contract_to_unisphere(points, self.bbox, self.unbounded)
         points = points * 2 - 1  # convert to [-1, 1] for grid sample
         features = self.get_trilinear_feature(points, self.grid)[..., 1:]
-        out.update(
-            {
-                "features": features,
-            }
-        )
+        out["features"] = features
         return out

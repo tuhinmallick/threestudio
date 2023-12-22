@@ -253,7 +253,7 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         if self.cfg.geometry_only:
             return {}
         assert (
-            output_normal == False
+            not output_normal
         ), f"Normal output is not supported for {self.__class__.__name__}"
         points_unscaled = points  # points in the original scale
         points = contract_to_unisphere(points, self.bbox)  # points normalized to (0, 1)
@@ -298,9 +298,7 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
             instance = TetrahedraSDFGrid(cfg, **kwargs)
             if other.cfg.isosurface_method != "mt":
                 other.cfg.isosurface_method = "mt"
-                threestudio.warn(
-                    f"Override isosurface_method of the source geometry to 'mt'"
-                )
+                threestudio.warn("Override isosurface_method of the source geometry to 'mt'")
             if other.cfg.isosurface_resolution != instance.cfg.isosurface_resolution:
                 other.cfg.isosurface_resolution = instance.cfg.isosurface_resolution
                 threestudio.warn(
@@ -321,9 +319,7 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
             instance = TetrahedraSDFGrid(cfg, **kwargs)
             if other.cfg.isosurface_method != "mt":
                 other.cfg.isosurface_method = "mt"
-                threestudio.warn(
-                    f"Override isosurface_method of the source geometry to 'mt'"
-                )
+                threestudio.warn("Override isosurface_method of the source geometry to 'mt'")
             if other.cfg.isosurface_resolution != instance.cfg.isosurface_resolution:
                 other.cfg.isosurface_resolution = instance.cfg.isosurface_resolution
                 threestudio.warn(
@@ -361,9 +357,5 @@ class TetrahedraSDFGrid(BaseExplicitGeometry):
         features = self.feature_network(enc).view(
             *points.shape[:-1], self.cfg.n_feature_dims
         )
-        out.update(
-            {
-                "features": features,
-            }
-        )
+        out["features"] = features
         return out

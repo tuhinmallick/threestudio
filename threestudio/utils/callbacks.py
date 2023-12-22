@@ -41,9 +41,7 @@ class VersionedCallback(Callback):
                 if bn.startswith("version_"):
                     dir_ver = os.path.splitext(bn)[0].split("_")[1].replace("/", "")
                     existing_versions.append(int(dir_ver))
-        if len(existing_versions) == 0:
-            return 0
-        return max(existing_versions) + 1
+        return 0 if not existing_versions else max(existing_versions) + 1
 
     @property
     def savedir(self):
@@ -145,12 +143,12 @@ class ProgressCallback(Callback):
 
     @rank_zero_only
     def on_validation_start(self, trainer, pl_module):
-        self.write(f"Rendering validation image ...")
+        self.write("Rendering validation image ...")
 
     @rank_zero_only
     def on_test_start(self, trainer, pl_module):
-        self.write(f"Rendering video ...")
+        self.write("Rendering video ...")
 
     @rank_zero_only
     def on_predict_start(self, trainer, pl_module):
-        self.write(f"Exporting mesh assets ...")
+        self.write("Exporting mesh assets ...")

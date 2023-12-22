@@ -279,7 +279,7 @@ class SpatialTransformer(nn.Module):
                     context_dim=context_dim,
                     disable_self_attn=disable_self_attn,
                 )
-                for d in range(depth)
+                for _ in range(depth)
             ]
         )
 

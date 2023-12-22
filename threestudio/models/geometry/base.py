@@ -20,15 +20,13 @@ from threestudio.utils.typing import *
 def contract_to_unisphere(
     x: Float[Tensor, "... 3"], bbox: Float[Tensor, "2 3"], unbounded: bool = False
 ) -> Float[Tensor, "... 3"]:
+    x = scale_tensor(x, bbox, (0, 1))
     if unbounded:
-        x = scale_tensor(x, bbox, (0, 1))
         x = x * 2 - 1  # aabb is at [-1, 1]
         mag = x.norm(dim=-1, keepdim=True)
         mask = mag.squeeze(-1) > 1
         x[mask] = (2 - 1 / mag[mask]) * (x[mask] / mag[mask])
         x = x / 4 + 0.5  # [-inf, inf] is at [0, 1]
-    else:
-        x = scale_tensor(x, bbox, (0, 1))
     return x
 
 
@@ -174,18 +172,16 @@ class BaseImplicitGeometry(BaseGeometry):
                 "Isosurface is not enabled in the current configuration"
             )
         self._initilize_isosurface_helper()
-        if self.cfg.isosurface_coarse_to_fine:
-            threestudio.debug("First run isosurface to get a tight bounding box ...")
-            with torch.no_grad():
-                mesh_coarse = self._isosurface(self.bbox)
-            vmin, vmax = mesh_coarse.v_pos.amin(dim=0), mesh_coarse.v_pos.amax(dim=0)
-            vmin_ = (vmin - (vmax - vmin) * 0.1).max(self.bbox[0])
-            vmax_ = (vmax + (vmax - vmin) * 0.1).min(self.bbox[1])
-            threestudio.debug("Run isosurface again with the tight bounding box ...")
-            mesh = self._isosurface(torch.stack([vmin_, vmax_], dim=0), fine_stage=True)
-        else:
-            mesh = self._isosurface(self.bbox)
-        return mesh
+        if not self.cfg.isosurface_coarse_to_fine:
+            return self._isosurface(self.bbox)
+        threestudio.debug("First run isosurface to get a tight bounding box ...")
+        with torch.no_grad():
+            mesh_coarse = self._isosurface(self.bbox)
+        vmin, vmax = mesh_coarse.v_pos.amin(dim=0), mesh_coarse.v_pos.amax(dim=0)
+        vmin_ = (vmin - (vmax - vmin) * 0.1).max(self.bbox[0])
+        vmax_ = (vmax + (vmax - vmin) * 0.1).min(self.bbox[1])
+        threestudio.debug("Run isosurface again with the tight bounding box ...")
+        return self._isosurface(torch.stack([vmin_, vmax_], dim=0), fine_stage=True)
 
 
 class BaseExplicitGeometry(BaseGeometry):

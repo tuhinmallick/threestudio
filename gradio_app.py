@@ -168,8 +168,7 @@ def get_current_status(process, trial_dir, alive_path):
         ]
         export_dirs = sorted(list(zip(export_dirs, steps)), key=lambda x: x[1])
         if len(export_dirs) > 0:
-            obj = glob.glob(os.path.join(export_dirs[-1][0], "*.obj"))
-            if len(obj) > 0:
+            if obj := glob.glob(os.path.join(export_dirs[-1][0], "*.obj")):
                 # FIXME
                 # seems the gr.Model3D cannot load our manually saved obj file
                 # here we load the obj and save it to a temporary file using trimesh

@@ -58,24 +58,23 @@ def parse_scheduler_to_instance(config, optimizer):
         schedulers = [
             parse_scheduler_to_instance(conf, optimizer) for conf in config.schedulers
         ]
-        scheduler = lr_scheduler.ChainedScheduler(schedulers)
+        return lr_scheduler.ChainedScheduler(schedulers)
     elif config.name == "Sequential":
         schedulers = [
             parse_scheduler_to_instance(conf, optimizer) for conf in config.schedulers
         ]
-        scheduler = lr_scheduler.SequentialLR(
+        return lr_scheduler.SequentialLR(
             optimizer, schedulers, milestones=config.milestones
         )
     else:
-        scheduler = getattr(lr_scheduler, config.name)(optimizer, **config.args)
-    return scheduler
+        return getattr(lr_scheduler, config.name)(optimizer, **config.args)
 
 
 def parse_scheduler(config, optimizer):
     interval = config.get("interval", "epoch")
     assert interval in ["epoch", "step"]
     if config.name == "SequentialLR":
-        scheduler = {
+        return {
             "scheduler": lr_scheduler.SequentialLR(
                 optimizer,
                 [
@@ -87,7 +86,7 @@ def parse_scheduler(config, optimizer):
             "interval": interval,
         }
     elif config.name == "ChainedScheduler":
-        scheduler = {
+        return {
             "scheduler": lr_scheduler.ChainedScheduler(
                 [
                     parse_scheduler(conf, optimizer)["scheduler"]
@@ -97,8 +96,7 @@ def parse_scheduler(config, optimizer):
             "interval": interval,
         }
     else:
-        scheduler = {
+        return {
             "scheduler": get_scheduler(config.name)(optimizer, **config.args),
             "interval": interval,
         }
-    return scheduler

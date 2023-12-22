@@ -50,7 +50,7 @@ class StableDiffusionGuidance(BaseObject):
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading Stable Diffusion ...")
+        threestudio.info("Loading Stable Diffusion ...")
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
@@ -135,7 +135,7 @@ class StableDiffusionGuidance(BaseObject):
 
         self.grad_clip_val: Optional[float] = None
 
-        threestudio.info(f"Loaded Stable Diffusion!")
+        threestudio.info("Loaded Stable Diffusion!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
@@ -191,8 +191,6 @@ class StableDiffusionGuidance(BaseObject):
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
     ):
-        batch_size = elevation.shape[0]
-
         if prompt_utils.use_perp_neg:
             (
                 text_embeddings,
@@ -209,6 +207,8 @@ class StableDiffusionGuidance(BaseObject):
                     torch.cat([t] * 4),
                     encoder_hidden_states=text_embeddings,
                 )  # (4B, 3, 64, 64)
+
+            batch_size = elevation.shape[0]
 
             noise_pred_text = noise_pred[:batch_size]
             noise_pred_uncond = noise_pred[batch_size : batch_size * 2]
@@ -284,8 +284,6 @@ class StableDiffusionGuidance(BaseObject):
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
     ):
-        batch_size = elevation.shape[0]
-
         sigma = self.us[t]
         sigma = sigma.view(-1, 1, 1, 1)
 
@@ -308,6 +306,8 @@ class StableDiffusionGuidance(BaseObject):
                     torch.cat([t] * 4),
                     encoder_hidden_states=text_embeddings,
                 )  # (4B, 3, 64, 64)
+
+            batch_size = elevation.shape[0]
 
             noise_pred_text = noise_pred[:batch_size]
             noise_pred_uncond = noise_pred[batch_size : batch_size * 2]
@@ -355,11 +355,7 @@ class StableDiffusionGuidance(BaseObject):
 
         Ds = zs - sigma * noise_pred
 
-        if self.cfg.var_red:
-            grad = -(Ds - y) / sigma
-        else:
-            grad = -(Ds - zs) / sigma
-
+        grad = -(Ds - y) / sigma if self.cfg.var_red else -(Ds - zs) / sigma
         guidance_eval_utils = {
             "use_perp_neg": prompt_utils.use_perp_neg,
             "neg_guidance_weights": neg_guidance_weights,
@@ -435,15 +431,17 @@ class StableDiffusionGuidance(BaseObject):
 
         if guidance_eval:
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
-            texts = []
-            for n, e, a, c in zip(
-                guidance_eval_out["noise_levels"], elevation, azimuth, camera_distances
-            ):
-                texts.append(
-                    f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+            texts = [
+                f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+                for n, e, a, c in zip(
+                    guidance_eval_out["noise_levels"],
+                    elevation,
+                    azimuth,
+                    camera_distances,
                 )
+            ]
             guidance_eval_out.update({"texts": texts})
-            guidance_out.update({"eval": guidance_eval_out})
+            guidance_out["eval"] = guidance_eval_out
 
         return guidance_out
 
@@ -457,8 +455,6 @@ class StableDiffusionGuidance(BaseObject):
         use_perp_neg=False,
         neg_guidance_weights=None,
     ):
-        batch_size = latents_noisy.shape[0]
-
         if use_perp_neg:
             # pred noise
             latent_model_input = torch.cat([latents_noisy] * 4, dim=0)
@@ -467,6 +463,8 @@ class StableDiffusionGuidance(BaseObject):
                 torch.cat([t.reshape(1)] * 4).to(self.device),
                 encoder_hidden_states=text_embeddings,
             )  # (4B, 3, 64, 64)
+
+            batch_size = latents_noisy.shape[0]
 
             noise_pred_text = noise_pred[:batch_size]
             noise_pred_uncond = noise_pred[batch_size : batch_size * 2]

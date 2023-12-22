@@ -80,7 +80,7 @@ def open_url(
     url_data = None
     with requests.Session() as session:
         if verbose:
-            print("Downloading %s ..." % url, end="", flush=True)
+            print(f"Downloading {url} ...", end="", flush=True)
         for attempts_left in reversed(range(num_attempts)):
             try:
                 with session.get(url) as res:
@@ -152,14 +152,13 @@ def get_data_from_str(input_str, nprc=None):
 
     pool = mp.Pool(processes=nprc)
 
-    vids = []
-    for v in tqdm(
-        pool.imap_unordered(load_video, vid_filelist),
-        total=len(vid_filelist),
-        desc="Loading videos...",
-    ):
-        vids.append(v)
-
+    vids = list(
+        tqdm(
+            pool.imap_unordered(load_video, vid_filelist),
+            total=len(vid_filelist),
+            desc="Loading videos...",
+        )
+    )
     vids = torch.stack(vids, dim=0).float()
 
     return vids
@@ -228,21 +227,18 @@ def compute_statistics(
     only_sample=False,
 ) -> Dict:
     detector_url = "https://www.dropbox.com/s/ge9e5ujwgetktms/i3d_torchscript.pt?dl=1"
-    detector_kwargs = dict(
-        rescale=True, resize=True, return_features=True
-    )  # Return raw features before the softmax layer.
-
     with open_url(detector_url, verbose=False) as f:
         detector = torch.jit.load(f).eval().to(device)
 
-    assert not (
-        only_sample and only_ref
+    assert (
+        not only_sample or not only_ref
     ), "only_ref and only_sample arguments are mutually exclusive"
 
     ref_embed, sample_embed = [], []
 
     info = f"Computing I3D activations for FVD score with batch size {bs}"
 
+    detector_kwargs = dict(rescale=True, resize=True, return_features=True)
     if only_ref:
         if not isvideo(videos_real):
             # if not is video we assume to have numpy arrays pf shape (n_vids, t, h, w, c) in range [0,255]
@@ -318,12 +314,12 @@ def compute_statistics(
             ref_embed.append(feats_ref)
 
     out = dict()
-    if len(sample_embed) > 0:
+    if sample_embed:
         sample_embed = np.concatenate(sample_embed, axis=0)
         mu_sample, sigma_sample = compute_stats(sample_embed)
         out.update({"mu_sample": mu_sample, "sigma_sample": sigma_sample})
 
-    if len(ref_embed) > 0:
+    if ref_embed:
         ref_embed = np.concatenate(ref_embed, axis=0)
         mu_ref, sigma_ref = compute_stats(ref_embed)
         out.update({"mu_ref": mu_ref, "sigma_ref": sigma_ref})

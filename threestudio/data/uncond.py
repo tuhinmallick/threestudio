@@ -222,17 +222,17 @@ class RandomCameraIterableDataset(IterableDataset, Updateable):
             torch.rand(self.batch_size, 3) * 2 * self.cfg.camera_perturb
             - self.cfg.camera_perturb
         )
-        camera_positions = camera_positions + camera_perturb
+        camera_positions += camera_perturb
         # sample center perturbations from a normal distribution with mean 0 and std center_perturb
         center_perturb: Float[Tensor, "B 3"] = (
             torch.randn(self.batch_size, 3) * self.cfg.center_perturb
         )
-        center = center + center_perturb
+        center += center_perturb
         # sample up perturbations from a normal distribution with mean 0 and std up_perturb
         up_perturb: Float[Tensor, "B 3"] = (
             torch.randn(self.batch_size, 3) * self.cfg.up_perturb
         )
-        up = up + up_perturb
+        up += up_perturb
 
         # sample fovs from a uniform distribution bounded by fov_range
         fovy_deg: Float[Tensor, "B"] = (

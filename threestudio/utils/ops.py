@@ -34,8 +34,7 @@ def scale_tensor(
     if isinstance(tgt_scale, Tensor):
         assert dat.shape[-1] == tgt_scale.shape[-1]
     dat = (dat - inp_scale[0]) / (inp_scale[1] - inp_scale[0])
-    dat = dat * (tgt_scale[1] - tgt_scale[0]) + tgt_scale[0]
-    return dat
+    return dat * (tgt_scale[1] - tgt_scale[0]) + tgt_scale[0]
 
 
 class _TruncExp(Function):  # pylint: disable=abstract-method
@@ -113,11 +112,14 @@ def get_activation(name) -> Callable:
 def chunk_batch(func: Callable, chunk_size: int, *args, **kwargs) -> Any:
     if chunk_size <= 0:
         return func(*args, **kwargs)
-    B = None
-    for arg in list(args) + list(kwargs.values()):
-        if isinstance(arg, torch.Tensor):
-            B = arg.shape[0]
-            break
+    B = next(
+        (
+            arg.shape[0]
+            for arg in list(args) + list(kwargs.values())
+            if isinstance(arg, torch.Tensor)
+        ),
+        None,
+    )
     assert (
         B is not None
     ), "No tensor found in args or kwargs, cannot determine batch size."
@@ -140,12 +142,10 @@ def chunk_batch(func: Callable, chunk_size: int, *args, **kwargs) -> Any:
         out_type = type(out_chunk)
         if isinstance(out_chunk, torch.Tensor):
             out_chunk = {0: out_chunk}
-        elif isinstance(out_chunk, tuple) or isinstance(out_chunk, list):
+        elif isinstance(out_chunk, (tuple, list)):
             chunk_length = len(out_chunk)
-            out_chunk = {i: chunk for i, chunk in enumerate(out_chunk)}
-        elif isinstance(out_chunk, dict):
-            pass
-        else:
+            out_chunk = dict(enumerate(out_chunk))
+        elif not isinstance(out_chunk, dict):
             print(
                 f"Return value of func must be in type [torch.Tensor, list, tuple, dict], get {type(out_chunk)}."
             )
@@ -159,10 +159,10 @@ def chunk_batch(func: Callable, chunk_size: int, *args, **kwargs) -> Any:
 
     out_merged: Dict[Any, Optional[torch.Tensor]] = {}
     for k, v in out.items():
-        if all([vv is None for vv in v]):
+        if all(vv is None for vv in v):
             # allow None in return value
             out_merged[k] = None
-        elif all([isinstance(vv, torch.Tensor) for vv in v]):
+        elif all(isinstance(vv, torch.Tensor) for vv in v):
             out_merged[k] = torch.cat(v, dim=0)
         else:
             raise TypeError(
@@ -290,9 +290,7 @@ def get_mvp_matrix(
     w2c[:, :3, :3] = c2w[:, :3, :3].permute(0, 2, 1)
     w2c[:, :3, 3:] = -c2w[:, :3, :3].permute(0, 2, 1) @ c2w[:, :3, 3:]
     w2c[:, 3, 3] = 1.0
-    # calculate mvp matrix by proj_mtx @ w2c (mv_mtx)
-    mvp_mtx = proj_mtx @ w2c
-    return mvp_mtx
+    return proj_mtx @ w2c
 
 
 def get_full_projection_matrix(
@@ -372,12 +370,11 @@ def tet_sdf_diff(
     sdf_f1x6x2 = vert_sdf[:, 0][tet_edges.reshape(-1)].reshape(-1, 2)
     mask = torch.sign(sdf_f1x6x2[..., 0]) != torch.sign(sdf_f1x6x2[..., 1])
     sdf_f1x6x2 = sdf_f1x6x2[mask]
-    sdf_diff = F.binary_cross_entropy_with_logits(
+    return F.binary_cross_entropy_with_logits(
         sdf_f1x6x2[..., 0], (sdf_f1x6x2[..., 1] > 0).float()
     ) + F.binary_cross_entropy_with_logits(
         sdf_f1x6x2[..., 1], (sdf_f1x6x2[..., 0] > 0).float()
     )
-    return sdf_diff
 
 
 # Implementation from Latent-NeRF
@@ -435,8 +432,7 @@ class MeshOBJ:
             query_np, self.v.astype(np.float32), self.f
         )
         distances = torch.from_numpy(distances).reshape(shp[:-1]).to(device)
-        weight = torch.exp(-(distances / (2 * sigma**2)))
-        return weight
+        return torch.exp(-(distances / (2 * sigma**2)))
 
 
 def ce_pq_loss(p, q, weight=None):
@@ -481,10 +477,7 @@ class ShapeLoss(nn.Module):
         indicator = (mesh_occ > 0.5).float()
         nerf_occ = 1 - torch.exp(-self.delta * sigmas)
         nerf_occ = nerf_occ.clamp(min=0, max=1.1)
-        loss = ce_pq_loss(
-            nerf_occ, indicator, weight=weight
-        )  # order is important for CE loss + second argument may not be optimized
-        return loss
+        return ce_pq_loss(nerf_occ, indicator, weight=weight)
 
 
 def shifted_expotional_decay(a, b, c, r):

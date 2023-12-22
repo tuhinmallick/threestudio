@@ -22,5 +22,4 @@ class IDFeatures(nn.Module):
             x = torch.nn.functional.interpolate(x, (256, 256), mode="area")
             x = x[:, :, 35:223, 32:220]
         x = self.face_pool(x)
-        x_feats = self.facenet(x)
-        return x_feats
+        return self.facenet(x)

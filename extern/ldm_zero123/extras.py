@@ -40,8 +40,8 @@ def load_training_dir(train_dir, device, epoch="last"):
     train_dir = Path(train_dir)
     ckpt = list(train_dir.rglob(f"*{epoch}.ckpt"))
     assert len(ckpt) == 1, f"found {len(ckpt)} matching ckpt files"
-    config = list(train_dir.rglob(f"*-project.yaml"))
-    assert len(ckpt) > 0, f"didn't find any config in {train_dir}"
+    config = list(train_dir.rglob("*-project.yaml"))
+    assert ckpt, f"didn't find any config in {train_dir}"
     if len(config) > 1:
         print(f"found {len(config)} matching config files")
         config = sorted(config)[-1]

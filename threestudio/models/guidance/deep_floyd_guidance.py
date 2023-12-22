@@ -44,7 +44,7 @@ class DeepFloydGuidance(BaseObject):
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading Deep Floyd ...")
+        threestudio.info("Loading Deep Floyd ...")
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
@@ -73,7 +73,7 @@ class DeepFloydGuidance(BaseObject):
                 )
             else:
                 threestudio.warn(
-                    f"Use DeepFloyd with xformers may raise error, see https://github.com/deep-floyd/IF/issues/52 to track this problem."
+                    "Use DeepFloyd with xformers may raise error, see https://github.com/deep-floyd/IF/issues/52 to track this problem."
                 )
                 self.pipe.enable_xformers_memory_efficient_attention()
 
@@ -102,7 +102,7 @@ class DeepFloydGuidance(BaseObject):
 
         self.grad_clip_val: Optional[float] = None
 
-        threestudio.info(f"Loaded Deep Floyd!")
+        threestudio.info("Loaded Deep Floyd!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
@@ -265,15 +265,17 @@ class DeepFloydGuidance(BaseObject):
                 "noise_pred": torch.cat([noise_pred, predicted_variance], dim=1),
             }
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
-            texts = []
-            for n, e, a, c in zip(
-                guidance_eval_out["noise_levels"], elevation, azimuth, camera_distances
-            ):
-                texts.append(
-                    f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+            texts = [
+                f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+                for n, e, a, c in zip(
+                    guidance_eval_out["noise_levels"],
+                    elevation,
+                    azimuth,
+                    camera_distances,
                 )
+            ]
             guidance_eval_out.update({"texts": texts})
-            guidance_out.update({"eval": guidance_eval_out})
+            guidance_out["eval"] = guidance_eval_out
 
         return guidance_out
 
@@ -287,7 +289,6 @@ class DeepFloydGuidance(BaseObject):
         use_perp_neg=False,
         neg_guidance_weights=None,
     ):
-        batch_size = latents_noisy.shape[0]
         if use_perp_neg:
             latent_model_input = torch.cat([latents_noisy] * 4, dim=0)
             noise_pred = self.forward_unet(
@@ -296,6 +297,7 @@ class DeepFloydGuidance(BaseObject):
                 encoder_hidden_states=text_embeddings,
             )  # (4B, 6, 64, 64)
 
+            batch_size = latents_noisy.shape[0]
             noise_pred_text, _ = noise_pred[:batch_size].split(3, dim=1)
             noise_pred_uncond, _ = noise_pred[batch_size : batch_size * 2].split(
                 3, dim=1

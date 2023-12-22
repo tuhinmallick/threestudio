@@ -60,10 +60,7 @@ class SaverMixin:
             )
 
     def get_loggers(self) -> List:
-        if self._wandb_logger:
-            return [self._wandb_logger]
-        else:
-            return []
+        return [self._wandb_logger] if self._wandb_logger else []
 
     DEFAULT_RGB_KWARGS = {"data_format": "HWC", "data_range": (0, 1)}
     DEFAULT_UV_KWARGS = {
@@ -185,7 +182,7 @@ class SaverMixin:
             img = img.clip(data_range[0], data_range[1])
             img = (img - data_range[0]) / (data_range[1] - data_range[0])
         assert cmap in [None, "jet", "magma", "spectral"]
-        if cmap == None:
+        if cmap is None:
             img = (img * 255.0).astype(np.uint8)
             img = np.repeat(img[..., None], 3, axis=2)
         elif cmap == "jet":
@@ -274,11 +271,11 @@ class SaverMixin:
                 cols.append(self.get_grayscale_image_(col["img"], **grayscale_kwargs))
 
         if align == "max":
-            h = max([col.shape[0] for col in cols])
-            w = max([col.shape[1] for col in cols])
+            h = max(col.shape[0] for col in cols)
+            w = max(col.shape[1] for col in cols)
         elif align == "min":
-            h = min([col.shape[0] for col in cols])
-            w = min([col.shape[1] for col in cols])
+            h = min(col.shape[0] for col in cols)
+            w = min(col.shape[1] for col in cols)
         elif isinstance(align, int):
             h = align
             w = align
@@ -330,11 +327,12 @@ class SaverMixin:
     def save_image(self, filename, img) -> str:
         save_path = self.get_save_path(filename)
         img = self.convert_data(img)
-        assert img.dtype == np.uint8 or img.dtype == np.uint16
-        if img.ndim == 3 and img.shape[-1] == 3:
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        elif img.ndim == 3 and img.shape[-1] == 4:
-            img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGRA)
+        assert img.dtype in [np.uint8, np.uint16]
+        if img.ndim == 3:
+            if img.shape[-1] == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+            elif img.shape[-1] == 4:
+                img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGRA)
         cv2.imwrite(save_path, img)
         return save_path
 
@@ -408,10 +406,7 @@ class SaverMixin:
         save_path = self.get_save_path(filename)
         matcher = re.compile(matcher)
         img_dir = os.path.join(self.get_save_dir(), img_dir)
-        imgs = []
-        for f in os.listdir(img_dir):
-            if matcher.search(f):
-                imgs.append(f)
+        imgs = [f for f in os.listdir(img_dir) if matcher.search(f)]
         imgs = sorted(imgs, key=lambda f: int(matcher.search(f).groups()[0]))
         imgs = [cv2.imread(os.path.join(img_dir, f)) for f in imgs]
 

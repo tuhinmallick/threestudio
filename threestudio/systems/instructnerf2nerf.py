@@ -63,7 +63,7 @@ class Instructnerf2nerf(BaseLift3DSystem):
         ):
             prompt_utils = self.prompt_processor()
             if (
-                not batch_index in self.edit_frames
+                batch_index not in self.edit_frames
                 or self.global_step % self.cfg.per_editing_step == 0
             ):
                 self.renderer.eval()

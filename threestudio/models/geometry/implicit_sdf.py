@@ -267,13 +267,13 @@ class ImplicitSDF(BaseImplicitGeometry):
             features = self.feature_network(enc).view(
                 *points.shape[:-1], self.cfg.n_feature_dims
             )
-            output.update({"features": features})
+            output["features"] = features
 
         if output_normal:
-            if (
-                self.cfg.normal_type == "finite_difference"
-                or self.cfg.normal_type == "finite_difference_laplacian"
-            ):
+            if self.cfg.normal_type in [
+                "finite_difference",
+                "finite_difference_laplacian",
+            ]:
                 assert self.finite_difference_normal_eps is not None
                 eps: float = self.finite_difference_normal_eps
                 if self.cfg.normal_type == "finite_difference_laplacian":
@@ -370,44 +370,41 @@ class ImplicitSDF(BaseImplicitGeometry):
         features = self.feature_network(enc).view(
             *points.shape[:-1], self.cfg.n_feature_dims
         )
-        out.update(
-            {
-                "features": features,
-            }
-        )
+        out["features"] = features
         return out
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
-        if (
-            self.cfg.normal_type == "finite_difference"
-            or self.cfg.normal_type == "finite_difference_laplacian"
-        ):
-            if isinstance(self.cfg.finite_difference_normal_eps, float):
-                self.finite_difference_normal_eps = (
-                    self.cfg.finite_difference_normal_eps
+        if self.cfg.normal_type not in [
+            "finite_difference",
+            "finite_difference_laplacian",
+        ]:
+            return
+        if isinstance(self.cfg.finite_difference_normal_eps, float):
+            self.finite_difference_normal_eps = (
+                self.cfg.finite_difference_normal_eps
+            )
+        elif self.cfg.finite_difference_normal_eps == "progressive":
+            # progressive finite difference eps from Neuralangelo
+            # https://arxiv.org/abs/2306.03092
+            hg_conf: Any = self.cfg.pos_encoding_config
+            assert (
+                hg_conf.otype == "ProgressiveBandHashGrid"
+            ), "finite_difference_normal_eps=progressive only works with ProgressiveBandHashGrid"
+            current_level = min(
+                hg_conf.start_level
+                + max(global_step - hg_conf.start_step, 0) // hg_conf.update_steps,
+                hg_conf.n_levels,
+            )
+            grid_res = hg_conf.base_resolution * hg_conf.per_level_scale ** (
+                current_level - 1
+            )
+            grid_size = 2 * self.cfg.radius / grid_res
+            if grid_size != self.finite_difference_normal_eps:
+                threestudio.info(
+                    f"Update finite_difference_normal_eps to {grid_size}"
                 )
-            elif self.cfg.finite_difference_normal_eps == "progressive":
-                # progressive finite difference eps from Neuralangelo
-                # https://arxiv.org/abs/2306.03092
-                hg_conf: Any = self.cfg.pos_encoding_config
-                assert (
-                    hg_conf.otype == "ProgressiveBandHashGrid"
-                ), "finite_difference_normal_eps=progressive only works with ProgressiveBandHashGrid"
-                current_level = min(
-                    hg_conf.start_level
-                    + max(global_step - hg_conf.start_step, 0) // hg_conf.update_steps,
-                    hg_conf.n_levels,
-                )
-                grid_res = hg_conf.base_resolution * hg_conf.per_level_scale ** (
-                    current_level - 1
-                )
-                grid_size = 2 * self.cfg.radius / grid_res
-                if grid_size != self.finite_difference_normal_eps:
-                    threestudio.info(
-                        f"Update finite_difference_normal_eps to {grid_size}"
-                    )
-                self.finite_difference_normal_eps = grid_size
-            else:
-                raise ValueError(
-                    f"Unknown finite_difference_normal_eps={self.cfg.finite_difference_normal_eps}"
-                )
+            self.finite_difference_normal_eps = grid_size
+        else:
+            raise ValueError(
+                f"Unknown finite_difference_normal_eps={self.cfg.finite_difference_normal_eps}"
+            )

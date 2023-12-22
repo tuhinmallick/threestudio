@@ -109,10 +109,7 @@ class GANVolumeRenderer(VolumeRenderer):
         out["comp_lr_rgb"] = comp_rgb.clone()
 
         posterior = DiagonalGaussianDistribution(latent.permute(0, 3, 1, 2))
-        if multi_level_guidance:
-            z_map = posterior.sample()
-        else:
-            z_map = posterior.mode()
+        z_map = posterior.sample() if multi_level_guidance else posterior.mode()
         lr_rgb = comp_rgb.permute(0, 3, 1, 2)
 
         if generator_level == 0:

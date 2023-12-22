@@ -61,7 +61,7 @@ class StableDiffusionVSDGuidance(BaseModule):
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading Stable Diffusion ...")
+        threestudio.info("Loading Stable Diffusion ...")
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
@@ -214,7 +214,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         self.grad_clip_val: Optional[float] = None
 
-        threestudio.info(f"Loaded Stable Diffusion!")
+        threestudio.info("Loaded Stable Diffusion!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
@@ -535,8 +535,7 @@ class StableDiffusionVSDGuidance(BaseModule):
 
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
 
-        grad = w * (noise_pred_pretrain - noise_pred_est)
-        return grad
+        return w * (noise_pred_pretrain - noise_pred_est)
 
     def train_lora(
         self,
@@ -587,16 +586,14 @@ class StableDiffusionVSDGuidance(BaseModule):
         self, rgb_BCHW: Float[Tensor, "B C H W"], rgb_as_latents=False
     ) -> Float[Tensor, "B 4 64 64"]:
         if rgb_as_latents:
-            latents = F.interpolate(
+            return F.interpolate(
                 rgb_BCHW, (64, 64), mode="bilinear", align_corners=False
             )
-        else:
-            rgb_BCHW_512 = F.interpolate(
-                rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
-            )
+        rgb_BCHW_512 = F.interpolate(
+            rgb_BCHW, (512, 512), mode="bilinear", align_corners=False
+        )
             # encode image into latents with vae
-            latents = self.encode_images(rgb_BCHW_512)
-        return latents
+        return self.encode_images(rgb_BCHW_512)
 
     def forward(
         self,
