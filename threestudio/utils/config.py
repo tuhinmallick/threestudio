@@ -29,9 +29,7 @@ OmegaConf.register_new_resolver(
 
 
 def C_max(value: Any) -> float:
-    if isinstance(value, int) or isinstance(value, float):
-        pass
-    else:
+    if not isinstance(value, int) and not isinstance(value, float):
         value = config_to_primitive(value)
         if not isinstance(value, list):
             raise TypeError("Scalar specification only supports list, got", type(value))
@@ -110,8 +108,7 @@ def load_config(*yamls: str, cli_args: list = [], from_string=False, **kwargs) -
     cfg = OmegaConf.merge(*yaml_confs, cli_conf, kwargs)
     OmegaConf.resolve(cfg)
     assert isinstance(cfg, DictConfig)
-    scfg = parse_structured(ExperimentConfig, cfg)
-    return scfg
+    return parse_structured(ExperimentConfig, cfg)
 
 
 def config_to_primitive(config, resolve: bool = True) -> Any:
@@ -124,5 +121,4 @@ def dump_config(path: str, config) -> None:
 
 
 def parse_structured(fields: Any, cfg: Optional[Union[dict, DictConfig]] = None) -> Any:
-    scfg = OmegaConf.structured(fields(**cfg))
-    return scfg
+    return OmegaConf.structured(fields(**cfg))

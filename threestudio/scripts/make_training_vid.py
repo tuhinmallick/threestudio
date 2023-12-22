@@ -50,11 +50,10 @@ def join(file1, file2, name):
     # file2 = "/admin/home-vikram/git/threestudio/outputs/zero123/64_dragon2_rgba.png@20230628-152734/save/it200-val.mp4"
     vid1 = imageio.mimread(file1)
     vid2 = imageio.mimread(file2)
-    frames = []
-    for f1, f2 in zip(vid1, vid2):
-        frames.append(
-            np.concatenate([f1[:, : f1.shape[0]], f2[:, : f2.shape[0]]], axis=1)
-        )
+    frames = [
+        np.concatenate([f1[:, : f1.shape[0]], f2[:, : f2.shape[0]]], axis=1)
+        for f1, f2 in zip(vid1, vid2)
+    ]
     imageio.mimwrite(name, frames)
 
 

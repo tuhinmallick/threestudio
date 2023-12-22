@@ -27,10 +27,8 @@ def get_obj_from_str(string, reload=False):
 
 
 def instantiate_from_config(config):
-    if not "target" in config:
-        if config == "__is_first_stage__":
-            return None
-        elif config == "__is_unconditional__":
+    if "target" not in config:
+        if config in ["__is_first_stage__", "__is_unconditional__"]:
             return None
         raise KeyError("Expected key `target` to instantiate.")
     return get_obj_from_str(config["target"])(**config.get("params", dict()))
@@ -100,7 +98,7 @@ class Zero123Guidance(BaseObject):
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading Zero123 ...")
+        threestudio.info("Loading Zero123 ...")
 
         self.config = OmegaConf.load(self.cfg.pretrained_config)
         # TODO: seems it cannot load into fp16...
@@ -139,7 +137,7 @@ class Zero123Guidance(BaseObject):
 
         self.prepare_embeddings(self.cfg.cond_image_path)
 
-        threestudio.info(f"Loaded Zero123!")
+        threestudio.info("Loaded Zero123!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
@@ -223,7 +221,6 @@ class Zero123Guidance(BaseObject):
             ],
             dim=-1,
         )[:, None, :].to(self.device)
-        cond = {}
         clip_emb = self.model.cc_projection(
             torch.cat(
                 [
@@ -235,9 +232,13 @@ class Zero123Guidance(BaseObject):
                 dim=-1,
             )
         )
-        cond["c_crossattn"] = [
-            torch.cat([torch.zeros_like(clip_emb).to(self.device), clip_emb], dim=0)
-        ]
+        cond = {
+            "c_crossattn": [
+                torch.cat(
+                    [torch.zeros_like(clip_emb).to(self.device), clip_emb], dim=0
+                )
+            ]
+        }
         cond["c_concat"] = [
             torch.cat(
                 [
@@ -335,15 +336,17 @@ class Zero123Guidance(BaseObject):
                 "noise_pred": noise_pred,
             }
             guidance_eval_out = self.guidance_eval(**guidance_eval_utils)
-            texts = []
-            for n, e, a, c in zip(
-                guidance_eval_out["noise_levels"], elevation, azimuth, camera_distances
-            ):
-                texts.append(
-                    f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+            texts = [
+                f"n{n:.02f}\ne{e.item():.01f}\na{a.item():.01f}\nc{c.item():.02f}"
+                for n, e, a, c in zip(
+                    guidance_eval_out["noise_levels"],
+                    elevation,
+                    azimuth,
+                    camera_distances,
                 )
+            ]
             guidance_eval_out.update({"texts": texts})
-            guidance_out.update({"eval": guidance_eval_out})
+            guidance_out["eval"] = guidance_eval_out
 
         return guidance_out
 
@@ -452,9 +455,7 @@ class Zero123Guidance(BaseObject):
             elevation, azimuth, camera_distances, c_crossattn, c_concat
         )
 
-        imgs = self.gen_from_cond(cond, scale, ddim_steps, post_process, ddim_eta)
-
-        return imgs
+        return self.gen_from_cond(cond, scale, ddim_steps, post_process, ddim_eta)
 
     # verification - requires `vram_O = False` in load_model_from_config
     @torch.no_grad()

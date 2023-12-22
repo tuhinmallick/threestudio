@@ -121,10 +121,7 @@ class FIDStatistics:
         # product might be almost singular
         covmean, _ = linalg.sqrtm(sigma1.dot(sigma2), disp=False)
         if not np.isfinite(covmean).all():
-            msg = (
-                "fid calculation produces singular product; adding %s to diagonal of cov estimates"
-                % eps
-            )
+            msg = f"fid calculation produces singular product; adding {eps} to diagonal of cov estimates"
             warnings.warn(msg)
             offset = np.eye(sigma1.shape[0]) * eps
             covmean = linalg.sqrtm((sigma1 + offset).dot(sigma2 + offset))
@@ -133,7 +130,7 @@ class FIDStatistics:
         if np.iscomplexobj(covmean):
             if not np.allclose(np.diagonal(covmean).imag, 0, atol=1e-3):
                 m = np.max(np.abs(covmean.imag))
-                raise ValueError("Imaginary component {}".format(m))
+                raise ValueError(f"Imaginary component {m}")
             covmean = covmean.real
 
         tr_covmean = np.trace(covmean)
@@ -625,7 +622,7 @@ def _download_inception_model():
     print("downloading InceptionV3 model...")
     with requests.get(INCEPTION_V3_URL, stream=True) as r:
         r.raise_for_status()
-        tmp_path = INCEPTION_V3_PATH + ".tmp"
+        tmp_path = f"{INCEPTION_V3_PATH}.tmp"
         with open(tmp_path, "wb") as f:
             for chunk in tqdm(r.iter_content(chunk_size=8192)):
                 f.write(chunk)
@@ -640,7 +637,7 @@ def _create_feature_graph(input_batch):
         graph_def.ParseFromString(f.read())
     pool3, spatial = tf.import_graph_def(
         graph_def,
-        input_map={f"ExpandDims:0": input_batch},
+        input_map={"ExpandDims:0": input_batch},
         return_elements=[FID_POOL_NAME, FID_SPATIAL_NAME],
         name=prefix,
     )
@@ -656,7 +653,7 @@ def _create_softmax_graph(input_batch):
         graph_def = tf.GraphDef()
         graph_def.ParseFromString(f.read())
     (matmul,) = tf.import_graph_def(
-        graph_def, return_elements=[f"softmax/logits/MatMul"], name=prefix
+        graph_def, return_elements=["softmax/logits/MatMul"], name=prefix
     )
     w = matmul.inputs[1]
     logits = tf.matmul(input_batch, w)
@@ -671,7 +668,7 @@ def _update_shapes(pool3):
             shape = o.get_shape()
             if shape._dims is not None:  # pylint: disable=protected-access
                 # shape = [s.value for s in shape] TF 1.x
-                shape = [s for s in shape]  # TF 2.x
+                shape = list(shape)
                 new_shape = []
                 for j, s in enumerate(shape):
                     if s == 1 and j == 0:

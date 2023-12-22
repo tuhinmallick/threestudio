@@ -27,10 +27,8 @@ def get_obj_from_str(string, reload=False):
 
 
 def instantiate_from_config(config):
-    if not "target" in config:
-        if config == "__is_first_stage__":
-            return None
-        elif config == "__is_unconditional__":
+    if "target" not in config:
+        if config in ["__is_first_stage__", "__is_unconditional__"]:
             return None
         raise KeyError("Expected key `target` to instantiate.")
     return get_obj_from_str(config["target"])(**config.get("params", dict()))
@@ -97,7 +95,7 @@ class StableZero123Guidance(BaseObject):
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading Stable Zero123 ...")
+        threestudio.info("Loading Stable Zero123 ...")
 
         self.config = OmegaConf.load(self.cfg.pretrained_config)
         # TODO: seems it cannot load into fp16...
@@ -136,7 +134,7 @@ class StableZero123Guidance(BaseObject):
 
         self.prepare_embeddings(self.cfg.cond_image_path)
 
-        threestudio.info(f"Loaded Stable Zero123!")
+        threestudio.info("Loaded Stable Zero123!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
@@ -222,7 +220,6 @@ class StableZero123Guidance(BaseObject):
             ],
             dim=-1,
         )[:, None, :].to(self.device)
-        cond = {}
         clip_emb = self.model.cc_projection(
             torch.cat(
                 [
@@ -234,9 +231,13 @@ class StableZero123Guidance(BaseObject):
                 dim=-1,
             )
         )
-        cond["c_crossattn"] = [
-            torch.cat([torch.zeros_like(clip_emb).to(self.device), clip_emb], dim=0)
-        ]
+        cond = {
+            "c_crossattn": [
+                torch.cat(
+                    [torch.zeros_like(clip_emb).to(self.device), clip_emb], dim=0
+                )
+            ]
+        }
         cond["c_concat"] = [
             torch.cat(
                 [
@@ -318,14 +319,12 @@ class StableZero123Guidance(BaseObject):
         # d(loss)/d(latents) = latents - target = latents - (latents - grad) = grad
         loss_sds = 0.5 * F.mse_loss(latents, target, reduction="sum") / batch_size
 
-        guidance_out = {
+        return {
             "loss_sds": loss_sds,
             "grad_norm": grad.norm(),
             "min_step": self.min_step,
             "max_step": self.max_step,
         }
-
-        return guidance_out
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
         # clip grad for stable training as demonstrated in

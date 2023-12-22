@@ -91,12 +91,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
                 else:
                     shading = "diffuse"
             else:
-                if self.ambient_only:
-                    shading = "albedo"
-                else:
-                    # return shaded color by default in evaluation
-                    shading = "diffuse"
-
+                shading = "albedo" if self.ambient_only else "diffuse"
         # multiply by 0 to prevent checking for unused parameters in DDP
         if shading == "albedo":
             return albedo + textureless_color * 0
@@ -108,10 +103,7 @@ class DiffuseWithPointLightMaterial(BaseMaterial):
             raise ValueError(f"Unknown shading type {shading}")
 
     def update_step(self, epoch: int, global_step: int, on_load_weights: bool = False):
-        if global_step < self.cfg.ambient_only_steps:
-            self.ambient_only = True
-        else:
-            self.ambient_only = False
+        self.ambient_only = global_step < self.cfg.ambient_only_steps
 
     def export(self, features: Float[Tensor, "*N Nf"], **kwargs) -> Dict[str, Any]:
         albedo = get_activation(self.cfg.albedo_activation)(features[..., :3]).clamp(

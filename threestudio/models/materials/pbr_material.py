@@ -134,10 +134,6 @@ class PBRMaterial(BaseMaterial):
             )
             perturb_normal = F.normalize(perturb_normal.clamp(-1, 1), dim=-1)
             perturb_normal = (perturb_normal + 1) / 2
-            out.update(
-                {
-                    "bump": perturb_normal,
-                }
-            )
+            out["bump"] = perturb_normal
 
         return out

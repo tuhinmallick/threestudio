@@ -9,15 +9,13 @@ def generator_loss(discriminator, inputs, reconstructions, cond=None):
         logits_fake = discriminator(
             torch.cat((reconstructions.contiguous(), cond), dim=1)
         )
-    g_loss = -torch.mean(logits_fake)
-    return g_loss
+    return -torch.mean(logits_fake)
 
 
 def hinge_d_loss(logits_real, logits_fake):
     loss_real = torch.mean(F.relu(1.0 - logits_real))
     loss_fake = torch.mean(F.relu(1.0 + logits_fake))
-    d_loss = 0.5 * (loss_real + loss_fake)
-    return d_loss
+    return 0.5 * (loss_real + loss_fake)
 
 
 def discriminator_loss(discriminator, inputs, reconstructions, cond=None):
@@ -31,5 +29,4 @@ def discriminator_loss(discriminator, inputs, reconstructions, cond=None):
         logits_fake = discriminator(
             torch.cat((reconstructions.contiguous().detach(), cond), dim=1)
         )
-    d_loss = hinge_d_loss(logits_real, logits_fake).mean()
-    return d_loss
+    return hinge_d_loss(logits_real, logits_fake).mean()

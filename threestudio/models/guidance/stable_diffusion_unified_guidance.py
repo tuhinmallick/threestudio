@@ -94,7 +94,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             torch.float16 if self.cfg.half_precision_weights else torch.float32
         )
 
-        threestudio.info(f"Loading Stable Diffusion ...")
+        threestudio.info("Loading Stable Diffusion ...")
 
         pipe_kwargs = {
             "tokenizer": None,
@@ -181,12 +181,12 @@ class StableDiffusionUnifiedGuidance(BaseModule):
                 self.lora_layers._load_state_dict_pre_hooks.clear()
                 self.lora_layers._state_dict_hooks.clear()
 
-        threestudio.info(f"Loaded Stable Diffusion!")
+        threestudio.info("Loaded Stable Diffusion!")
 
         # controlnet
         controlnet = None
         if self.cfg.controlnet_model_name_or_path is not None:
-            threestudio.info(f"Loading ControlNet ...")
+            threestudio.info("Loading ControlNet ...")
 
             controlnet = ControlNetModel.from_pretrained(
                 self.cfg.controlnet_model_name_or_path,
@@ -195,7 +195,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             controlnet.eval()
             enable_gradient(controlnet, enabled=False)
 
-            threestudio.info(f"Loaded ControlNet!")
+            threestudio.info("Loaded ControlNet!")
 
         self.scheduler = DDPMScheduler.from_config(pipe.scheduler.config)
         self.num_train_timesteps = self.scheduler.config.num_train_timesteps
@@ -309,10 +309,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         # expect input in [-1, 1]
         input_dtype = imgs.dtype
         posterior = vae.encode(imgs.to(vae.dtype)).latent_dist
-        if mode:
-            latents = posterior.mode()
-        else:
-            latents = posterior.sample()
+        latents = posterior.mode() if mode else posterior.sample()
         latents = latents * vae.config.scaling_factor
         return latents.to(input_dtype)
 
@@ -322,7 +319,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
     ) -> Float[Tensor, "B 3 H W"]:
         # output in [0, 1]
         input_dtype = latents.dtype
-        latents = 1 / vae.config.scaling_factor * latents
+        latents *= 1 / vae.config.scaling_factor
         image = vae.decode(latents.to(vae.dtype)).sample
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
@@ -354,8 +351,6 @@ class StableDiffusionUnifiedGuidance(BaseModule):
         azimuth: Float[Tensor, "B"],
         camera_distances: Float[Tensor, "B"],
     ) -> Float[Tensor, "B 4 Hl Wl"]:
-        batch_size = latents_noisy.shape[0]
-
         if prompt_utils.use_perp_neg:
             (
                 text_embeddings,
@@ -376,6 +371,8 @@ class StableDiffusionUnifiedGuidance(BaseModule):
                         velocity_to_epsilon=self.pipe.scheduler.config.prediction_type
                         == "v_prediction",
                     )  # (4B, 3, Hl, Wl)
+
+            batch_size = latents_noisy.shape[0]
 
             noise_pred_text = noise_pred[:batch_size]
             noise_pred_uncond = noise_pred[batch_size : batch_size * 2]
@@ -658,7 +655,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
                 rgb_1step_orig = self.vae_decode(
                     self.pipe.vae, latents_1step_orig
                 ).permute(0, 2, 3, 1)
-            guidance_out.update({"rgb_1step_orig": rgb_1step_orig})
+            guidance_out["rgb_1step_orig"] = rgb_1step_orig
 
         if self.cfg.return_rgb_multistep_orig:
             with self.set_scheduler(
@@ -701,11 +698,7 @@ class StableDiffusionUnifiedGuidance(BaseModule):
             )
 
         if self.cfg.guidance_type == "vsd":
-            guidance_out.update(
-                {
-                    "loss_train_phi": loss_train_phi,
-                }
-            )
+            guidance_out["loss_train_phi"] = loss_train_phi
 
         return guidance_out
 

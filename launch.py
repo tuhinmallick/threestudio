@@ -90,13 +90,10 @@ def load_custom_modules():
                 (time.perf_counter() - time_before, module_path, success)
             )
 
-    if len(node_import_times) > 0:
+    if node_import_times:
         print("\nImport times for custom modules:")
         for n in sorted(node_import_times):
-            if n[2]:
-                import_message = ""
-            else:
-                import_message = " (IMPORT FAILED)"
+            import_message = "" if n[2] else " (IMPORT FAILED)"
             print("{:6.1f} seconds{}:".format(n[0], import_message), n[1])
         print()
 
@@ -112,7 +109,7 @@ def main(args, extras) -> None:
     # As far as Pytorch Lightning is concerned, we always use all available GPUs
     # (possibly filtered by CUDA_VISIBLE_DEVICES).
     devices = -1
-    if len(env_gpus) > 0:
+    if env_gpus:
         # CUDA_VISIBLE_DEVICES was set already, e.g. within SLURM srun or higher-level script.
         n_gpus = len(env_gpus)
     else:

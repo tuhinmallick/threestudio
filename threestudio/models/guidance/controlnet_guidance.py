@@ -53,7 +53,7 @@ class ControlNetGuidance(BaseObject):
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading ControlNet ...")
+        threestudio.info("Loading ControlNet ...")
 
         controlnet_name_or_path: str
         if self.cfg.control_type == "normal":
@@ -137,7 +137,7 @@ class ControlNetGuidance(BaseObject):
 
         self.grad_clip_val: Optional[float] = None
 
-        threestudio.info(f"Loaded ControlNet!")
+        threestudio.info("Loaded ControlNet!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
@@ -209,7 +209,7 @@ class ControlNetGuidance(BaseObject):
         self, latents: Float[Tensor, "B 4 DH DW"]
     ) -> Float[Tensor, "B 3 H W"]:
         input_dtype = latents.dtype
-        latents = 1 / self.vae.config.scaling_factor * latents
+        latents *= 1 / self.vae.config.scaling_factor
         image = self.vae.decode(latents.to(self.weights_dtype)).sample
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
@@ -230,7 +230,7 @@ class ControlNetGuidance(BaseObject):
 
             # sections of code used from https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion_instruct_pix2pix.py
             threestudio.debug("Start editing...")
-            for i, t in enumerate(self.scheduler.timesteps):
+            for t in self.scheduler.timesteps:
                 # predict the noise residual with unet, NO grad!
                 with torch.no_grad():
                     # pred noise
@@ -329,8 +329,7 @@ class ControlNetGuidance(BaseObject):
         )
 
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
-        grad = w * (noise_pred - noise)
-        return grad
+        return w * (noise_pred - noise)
 
     def __call__(
         self,

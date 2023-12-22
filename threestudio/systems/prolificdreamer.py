@@ -47,15 +47,11 @@ class ProlificDreamer(BaseLift3DSystem):
 
         if self.cfg.stage == "geometry":
             guidance_inp = out["comp_normal"]
-            guidance_out = self.guidance(
-                guidance_inp, self.prompt_utils, **batch, rgb_as_latents=False
-            )
         else:
             guidance_inp = out["comp_rgb"]
-            guidance_out = self.guidance(
-                guidance_inp, self.prompt_utils, **batch, rgb_as_latents=False
-            )
-
+        guidance_out = self.guidance(
+            guidance_inp, self.prompt_utils, **batch, rgb_as_latents=False
+        )
         loss = 0.0
 
         for name, value in guidance_out.items():
@@ -114,9 +110,7 @@ class ProlificDreamer(BaseLift3DSystem):
                 loss += loss_laplacian_smoothness * self.C(
                     self.cfg.loss.lambda_laplacian_smoothness
                 )
-        elif self.cfg.stage == "texture":
-            pass
-        else:
+        elif self.cfg.stage != "texture":
             raise ValueError(f"Unknown stage {self.cfg.stage}")
 
         for name, value in self.cfg.loss.items():

@@ -45,7 +45,8 @@ def load_module_weights(
         state_dict_to_load = {}
         for k, v in state_dict.items():
             ignore = any(
-                [k.startswith(ignore_module + ".") for ignore_module in ignore_modules]
+                k.startswith(f"{ignore_module}.")
+                for ignore_module in ignore_modules
             )
             if ignore:
                 continue
@@ -63,9 +64,7 @@ def load_module_weights(
 
 
 def C(value: Any, epoch: int, global_step: int) -> float:
-    if isinstance(value, int) or isinstance(value, float):
-        pass
-    else:
+    if not isinstance(value, int) and not isinstance(value, float):
         value = config_to_primitive(value)
         if not isinstance(value, list):
             raise TypeError("Scalar specification only supports list, got", type(value))
@@ -124,11 +123,9 @@ def barrier():
 
 
 def broadcast(tensor, src=0):
-    if not _distributed_available():
-        return tensor
-    else:
+    if _distributed_available():
         torch.distributed.broadcast(tensor, src=src)
-        return tensor
+    return tensor
 
 
 def enable_gradient(model, enabled: bool = True) -> None:
@@ -137,21 +134,20 @@ def enable_gradient(model, enabled: bool = True) -> None:
 
 
 def find_last_path(path: str):
-    if (path is not None) and ("LAST" in path):
-        path = path.replace(" ", "_")
-        base_dir_prefix, suffix = path.split("LAST", 1)
-        base_dir = os.path.dirname(base_dir_prefix)
-        prefix = os.path.split(base_dir_prefix)[-1]
-        base_dir_prefix = os.path.join(base_dir, prefix)
-        all_path = os.listdir(base_dir)
-        all_path = [os.path.join(base_dir, dir) for dir in all_path]
-        filtered_path = [dir for dir in all_path if dir.startswith(base_dir_prefix)]
-        filtered_path.sort(reverse=True)
-        last_path = filtered_path[0]
-        new_path = last_path + suffix
-        if os.path.exists(new_path):
-            return new_path
-        else:
-            raise FileNotFoundError(new_path)
-    else:
+    if path is None or "LAST" not in path:
         return path
+    path = path.replace(" ", "_")
+    base_dir_prefix, suffix = path.split("LAST", 1)
+    base_dir = os.path.dirname(base_dir_prefix)
+    prefix = os.path.split(base_dir_prefix)[-1]
+    base_dir_prefix = os.path.join(base_dir, prefix)
+    all_path = os.listdir(base_dir)
+    all_path = [os.path.join(base_dir, dir) for dir in all_path]
+    filtered_path = [dir for dir in all_path if dir.startswith(base_dir_prefix)]
+    filtered_path.sort(reverse=True)
+    last_path = filtered_path[0]
+    new_path = last_path + suffix
+    if os.path.exists(new_path):
+        return new_path
+    else:
+        raise FileNotFoundError(new_path)

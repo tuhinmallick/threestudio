@@ -61,7 +61,7 @@ class NVDiffRasterizer(Rasterizer):
         gb_normal_aa = self.ctx.antialias(
             gb_normal_aa, rast, v_pos_clip, mesh.t_pos_idx
         )
-        out.update({"comp_normal": gb_normal_aa})  # in [0, 1]
+        out["comp_normal"] = gb_normal_aa
 
         # TODO: make it clear whether to compute the normal, now we compute it in all cases
         # consider using: require_normal_computation = render_normal or (render_rgb and material.requires_normal)

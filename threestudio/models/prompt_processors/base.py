@@ -125,31 +125,30 @@ class PromptProcessorOutput:
                     self.uncond_text_embeddings_vd[idx],
                 ]
                 neg_guidance_weights += [0.0, 0.0]
-            else:  # interpolating views
-                if torch.abs(azi) < 90:
-                    # front-side interpolation
-                    # 0 - complete side, 1 - complete front
-                    r_inter = 1 - torch.abs(azi) / 90
-                    pos_text_embeddings.append(
-                        r_inter * front_emb + (1 - r_inter) * side_emb
-                    )
-                    neg_text_embeddings += [front_emb, side_emb]
-                    neg_guidance_weights += [
-                        -shifted_expotional_decay(*self.perp_neg_f_fs, r_inter),
-                        -shifted_expotional_decay(*self.perp_neg_f_sf, 1 - r_inter),
-                    ]
-                else:
-                    # side-back interpolation
-                    # 0 - complete back, 1 - complete side
-                    r_inter = 2.0 - torch.abs(azi) / 90
-                    pos_text_embeddings.append(
-                        r_inter * side_emb + (1 - r_inter) * back_emb
-                    )
-                    neg_text_embeddings += [side_emb, front_emb]
-                    neg_guidance_weights += [
-                        -shifted_expotional_decay(*self.perp_neg_f_sb, r_inter),
-                        -shifted_expotional_decay(*self.perp_neg_f_fsb, r_inter),
-                    ]
+            elif torch.abs(azi) < 90:
+                # front-side interpolation
+                # 0 - complete side, 1 - complete front
+                r_inter = 1 - torch.abs(azi) / 90
+                pos_text_embeddings.append(
+                    r_inter * front_emb + (1 - r_inter) * side_emb
+                )
+                neg_text_embeddings += [front_emb, side_emb]
+                neg_guidance_weights += [
+                    -shifted_expotional_decay(*self.perp_neg_f_fs, r_inter),
+                    -shifted_expotional_decay(*self.perp_neg_f_sf, 1 - r_inter),
+                ]
+            else:
+                # side-back interpolation
+                # 0 - complete back, 1 - complete side
+                r_inter = 2.0 - torch.abs(azi) / 90
+                pos_text_embeddings.append(
+                    r_inter * side_emb + (1 - r_inter) * back_emb
+                )
+                neg_text_embeddings += [side_emb, front_emb]
+                neg_guidance_weights += [
+                    -shifted_expotional_decay(*self.perp_neg_f_sb, r_inter),
+                    -shifted_expotional_decay(*self.perp_neg_f_fsb, r_inter),
+                ]
 
         text_embeddings = torch.cat(
             [
@@ -366,7 +365,7 @@ class PromptProcessor(BaseObject):
                     continue
             prompts_to_process.append(prompt)
 
-        if len(prompts_to_process) > 0:
+        if prompts_to_process:
             if self.cfg.spawn:
                 ctx = mp.get_context("spawn")
                 subprocess = ctx.Process(
@@ -400,7 +399,7 @@ class PromptProcessor(BaseObject):
         self.uncond_text_embeddings_vd = torch.stack(
             [self.load_from_cache(prompt) for prompt in self.negative_prompts_vd], dim=0
         )
-        threestudio.debug(f"Loaded text embeddings.")
+        threestudio.debug("Loaded text embeddings.")
 
     def load_from_cache(self, prompt):
         cache_path = os.path.join(
@@ -414,25 +413,24 @@ class PromptProcessor(BaseObject):
         return torch.load(cache_path, map_location=self.device)
 
     def preprocess_prompt(self, prompt: str) -> str:
-        if prompt.startswith("lib:"):
-            # find matches in the library
-            candidate = None
-            keywords = prompt[4:].lower().split("_")
-            for prompt in self.prompt_library["dreamfusion"]:
-                if all([k in prompt.lower() for k in keywords]):
-                    if candidate is not None:
-                        raise ValueError(
-                            f"Multiple prompts matched with keywords {keywords} in library"
-                        )
-                    candidate = prompt
-            if candidate is None:
-                raise ValueError(
-                    f"Cannot find prompt with keywords {keywords} in library"
-                )
-            threestudio.info("Find matched prompt in library: " + candidate)
-            return candidate
-        else:
+        if not prompt.startswith("lib:"):
             return prompt
+        # find matches in the library
+        candidate = None
+        keywords = prompt[4:].lower().split("_")
+        for prompt in self.prompt_library["dreamfusion"]:
+            if all(k in prompt.lower() for k in keywords):
+                if candidate is not None:
+                    raise ValueError(
+                        f"Multiple prompts matched with keywords {keywords} in library"
+                    )
+                candidate = prompt
+        if candidate is None:
+            raise ValueError(
+                f"Cannot find prompt with keywords {keywords} in library"
+            )
+        threestudio.info(f"Find matched prompt in library: {candidate}")
+        return candidate
 
     def get_text_embeddings(
         self, prompt: Union[str, List[str]], negative_prompt: Union[str, List[str]]

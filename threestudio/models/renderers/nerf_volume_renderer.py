@@ -388,19 +388,15 @@ class NeRFVolumeRenderer(VolumeRenderer):
                     comp_normal = (
                         (comp_normal + 1.0) / 2.0 * opacity
                     )  # for visualization
-                    out.update(
-                        {
-                            "comp_normal": comp_normal.view(
-                                batch_size, height, width, 3
-                            ),
-                        }
+                    out["comp_normal"] = comp_normal.view(
+                        batch_size, height, width, 3
                     )
                 if self.cfg.return_normal_perturb:
                     normal_perturb = self.geometry(
                         positions + torch.randn_like(positions) * 1e-2,
                         output_normal=self.material.requires_normal,
                     )["normal"]
-                    out.update({"normal_perturb": normal_perturb})
+                    out["normal_perturb"] = normal_perturb
         else:
             if "normal" in geo_out:
                 comp_normal = nerfacc.accumulate_along_rays(
@@ -411,11 +407,7 @@ class NeRFVolumeRenderer(VolumeRenderer):
                 )
                 comp_normal = F.normalize(comp_normal, dim=-1)
                 comp_normal = (comp_normal + 1.0) / 2.0 * opacity  # for visualization
-                out.update(
-                    {
-                        "comp_normal": comp_normal.view(batch_size, height, width, 3),
-                    }
-                )
+                out["comp_normal"] = comp_normal.view(batch_size, height, width, 3)
 
         return out
 

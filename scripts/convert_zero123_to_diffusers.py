@@ -21,14 +21,13 @@ def create_unet_diffusers_config(original_config, image_size: int, controlnet=Fa
     """
     if controlnet:
         unet_params = original_config.model.params.control_stage_config.params
-    else:
-        if (
+    elif (
             "unet_config" in original_config.model.params
             and original_config.model.params.unet_config is not None
         ):
-            unet_params = original_config.model.params.unet_config.params
-        else:
-            unet_params = original_config.model.params.network_config.params
+        unet_params = original_config.model.params.unet_config.params
+    else:
+        unet_params = original_config.model.params.network_config.params
 
     vae_params = original_config.model.params.first_stage_config.params.ddconfig
 
@@ -49,7 +48,7 @@ def create_unet_diffusers_config(original_config, image_size: int, controlnet=Fa
             resolution *= 2
 
     up_block_types = []
-    for i in range(len(block_out_channels)):
+    for _ in block_out_channels:
         block_type = (
             "CrossAttnUpBlock2D"
             if resolution in unet_params.attention_resolutions
@@ -95,20 +94,19 @@ def create_unet_diffusers_config(original_config, image_size: int, controlnet=Fa
         )
 
     if "num_classes" in unet_params:
-        if unet_params.num_classes == "sequential":
-            if context_dim in [2048, 1280]:
-                # SDXL
-                addition_embed_type = "text_time"
-                addition_time_embed_dim = 256
-            else:
-                class_embed_type = "projection"
-            assert "adm_in_channels" in unet_params
-            projection_class_embeddings_input_dim = unet_params.adm_in_channels
-        else:
+        if unet_params.num_classes != "sequential":
             raise NotImplementedError(
                 f"Unknown conditional unet num_classes config: {unet_params.num_classes}"
             )
 
+        if context_dim in [2048, 1280]:
+            # SDXL
+            addition_embed_type = "text_time"
+            addition_time_embed_dim = 256
+        else:
+            class_embed_type = "projection"
+        assert "adm_in_channels" in unet_params
+        projection_class_embeddings_input_dim = unet_params.adm_in_channels
     config = {
         "sample_size": image_size // vae_scale_factor,
         "in_channels": unet_params.in_channels,
@@ -245,16 +243,7 @@ def renew_attention_paths(old_list, n_shave_prefix_segments=0):
     for old_item in old_list:
         new_item = old_item
 
-        #         new_item = new_item.replace('norm.weight', 'group_norm.weight')
-        #         new_item = new_item.replace('norm.bias', 'group_norm.bias')
-
-        #         new_item = new_item.replace('proj_out.weight', 'proj_attn.weight')
-        #         new_item = new_item.replace('proj_out.bias', 'proj_attn.bias')
-
-        #         new_item = shave_segments(new_item, n_shave_prefix_segments=n_shave_prefix_segments)
-
-        mapping.append({"old": old_item, "new": new_item})
-
+        mapping.append({"old": new_item, "new": new_item})
     return mapping
 
 
@@ -277,11 +266,7 @@ def convert_ldm_unet_checkpoint(
         unet_state_dict = {}
         keys = list(checkpoint.keys())
 
-        if controlnet:
-            unet_key = "control_model."
-        else:
-            unet_key = "model.diffusion_model."
-
+        unet_key = "control_model." if controlnet else "model.diffusion_model."
         # at least a 100 parameters have to start with `model_ema` in order for the checkpoint to be EMA
         if sum(k.startswith("model_ema") for k in keys) > 100 and extract_ema:
             logger.warning(f"Checkpoint {path} has both EMA and non-EMA weights.")
@@ -306,28 +291,21 @@ def convert_ldm_unet_checkpoint(
                 if key.startswith(unet_key):
                     unet_state_dict[key.replace(unet_key, "")] = checkpoint[key]
 
-    new_checkpoint = {}
-
-    new_checkpoint["time_embedding.linear_1.weight"] = unet_state_dict[
-        "time_embed.0.weight"
-    ]
-    new_checkpoint["time_embedding.linear_1.bias"] = unet_state_dict[
-        "time_embed.0.bias"
-    ]
-    new_checkpoint["time_embedding.linear_2.weight"] = unet_state_dict[
-        "time_embed.2.weight"
-    ]
-    new_checkpoint["time_embedding.linear_2.bias"] = unet_state_dict[
-        "time_embed.2.bias"
-    ]
+    new_checkpoint = {
+        "time_embedding.linear_1.weight": unet_state_dict[
+            "time_embed.0.weight"
+        ],
+        "time_embedding.linear_1.bias": unet_state_dict["time_embed.0.bias"],
+        "time_embedding.linear_2.weight": unet_state_dict[
+            "time_embed.2.weight"
+        ],
+        "time_embedding.linear_2.bias": unet_state_dict["time_embed.2.bias"],
+    }
 
     if config["class_embed_type"] is None:
         # No parameters to port
         ...
-    elif (
-        config["class_embed_type"] == "timestep"
-        or config["class_embed_type"] == "projection"
-    ):
+    elif config["class_embed_type"] in ["timestep", "projection"]:
         new_checkpoint["class_embedding.linear_1.weight"] = unet_state_dict[
             "label_emb.0.0.weight"
         ]
@@ -568,16 +546,13 @@ def convert_ldm_unet_checkpoint(
 
         orig_index += 2
 
-        diffusers_index = 0
-
-        while diffusers_index < 6:
+        for diffusers_index in range(6):
             new_checkpoint[
                 f"controlnet_cond_embedding.blocks.{diffusers_index}.weight"
             ] = unet_state_dict.pop(f"input_hint_block.{orig_index}.weight")
             new_checkpoint[
                 f"controlnet_cond_embedding.blocks.{diffusers_index}.bias"
             ] = unet_state_dict.pop(f"input_hint_block.{orig_index}.bias")
-            diffusers_index += 1
             orig_index += 2
 
         new_checkpoint[
@@ -618,7 +593,7 @@ def create_vae_diffusers_config(original_config, image_size: int):
     down_block_types = ["DownEncoderBlock2D"] * len(block_out_channels)
     up_block_types = ["UpDecoderBlock2D"] * len(block_out_channels)
 
-    config = {
+    return {
         "sample_size": image_size,
         "in_channels": vae_params.in_channels,
         "out_channels": vae_params.out_ch,
@@ -628,50 +603,38 @@ def create_vae_diffusers_config(original_config, image_size: int):
         "latent_channels": vae_params.z_channels,
         "layers_per_block": vae_params.num_res_blocks,
     }
-    return config
 
 
 def convert_ldm_vae_checkpoint(checkpoint, config):
-    # extract state dict for VAE
-    vae_state_dict = {}
     vae_key = "first_stage_model."
     keys = list(checkpoint.keys())
-    for key in keys:
-        if key.startswith(vae_key):
-            vae_state_dict[key.replace(vae_key, "")] = checkpoint.get(key)
-
-    new_checkpoint = {}
-
-    new_checkpoint["encoder.conv_in.weight"] = vae_state_dict["encoder.conv_in.weight"]
-    new_checkpoint["encoder.conv_in.bias"] = vae_state_dict["encoder.conv_in.bias"]
-    new_checkpoint["encoder.conv_out.weight"] = vae_state_dict[
-        "encoder.conv_out.weight"
-    ]
-    new_checkpoint["encoder.conv_out.bias"] = vae_state_dict["encoder.conv_out.bias"]
-    new_checkpoint["encoder.conv_norm_out.weight"] = vae_state_dict[
-        "encoder.norm_out.weight"
-    ]
-    new_checkpoint["encoder.conv_norm_out.bias"] = vae_state_dict[
-        "encoder.norm_out.bias"
-    ]
-
-    new_checkpoint["decoder.conv_in.weight"] = vae_state_dict["decoder.conv_in.weight"]
-    new_checkpoint["decoder.conv_in.bias"] = vae_state_dict["decoder.conv_in.bias"]
-    new_checkpoint["decoder.conv_out.weight"] = vae_state_dict[
-        "decoder.conv_out.weight"
-    ]
-    new_checkpoint["decoder.conv_out.bias"] = vae_state_dict["decoder.conv_out.bias"]
-    new_checkpoint["decoder.conv_norm_out.weight"] = vae_state_dict[
-        "decoder.norm_out.weight"
-    ]
-    new_checkpoint["decoder.conv_norm_out.bias"] = vae_state_dict[
-        "decoder.norm_out.bias"
-    ]
-
-    new_checkpoint["quant_conv.weight"] = vae_state_dict["quant_conv.weight"]
-    new_checkpoint["quant_conv.bias"] = vae_state_dict["quant_conv.bias"]
-    new_checkpoint["post_quant_conv.weight"] = vae_state_dict["post_quant_conv.weight"]
-    new_checkpoint["post_quant_conv.bias"] = vae_state_dict["post_quant_conv.bias"]
+    vae_state_dict = {
+        key.replace(vae_key, ""): checkpoint.get(key)
+        for key in keys
+        if key.startswith(vae_key)
+    }
+    new_checkpoint = {
+        "encoder.conv_in.weight": vae_state_dict["encoder.conv_in.weight"],
+        "encoder.conv_in.bias": vae_state_dict["encoder.conv_in.bias"],
+        "encoder.conv_out.weight": vae_state_dict["encoder.conv_out.weight"],
+        "encoder.conv_out.bias": vae_state_dict["encoder.conv_out.bias"],
+        "encoder.conv_norm_out.weight": vae_state_dict[
+            "encoder.norm_out.weight"
+        ],
+        "encoder.conv_norm_out.bias": vae_state_dict["encoder.norm_out.bias"],
+        "decoder.conv_in.weight": vae_state_dict["decoder.conv_in.weight"],
+        "decoder.conv_in.bias": vae_state_dict["decoder.conv_in.bias"],
+        "decoder.conv_out.weight": vae_state_dict["decoder.conv_out.weight"],
+        "decoder.conv_out.bias": vae_state_dict["decoder.conv_out.bias"],
+        "decoder.conv_norm_out.weight": vae_state_dict[
+            "decoder.norm_out.weight"
+        ],
+        "decoder.conv_norm_out.bias": vae_state_dict["decoder.norm_out.bias"],
+        "quant_conv.weight": vae_state_dict["quant_conv.weight"],
+        "quant_conv.bias": vae_state_dict["quant_conv.bias"],
+        "post_quant_conv.weight": vae_state_dict["post_quant_conv.weight"],
+        "post_quant_conv.bias": vae_state_dict["post_quant_conv.bias"],
+    }
 
     # Retrieves the keys for the encoder down blocks only
     num_down_blocks = len(
@@ -953,7 +916,7 @@ def convert_from_original_zero123_ckpt(
         }
     )
 
-    pipe = Zero123Pipeline(
+    return Zero123Pipeline(
         vae,
         image_encoder,
         unet,
@@ -963,8 +926,6 @@ def convert_from_original_zero123_ckpt(
         clip_camera_projection,
         requires_safety_checker=False,
     )
-
-    return pipe
 
 
 if __name__ == "__main__":

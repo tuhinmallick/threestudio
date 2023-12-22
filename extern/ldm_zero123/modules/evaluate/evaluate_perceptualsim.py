@@ -86,9 +86,9 @@ class squeezenet(torch.nn.Module):
             "SqueezeOutputs",
             ["relu1", "relu2", "relu3", "relu4", "relu5", "relu6", "relu7"],
         )
-        out = vgg_outputs(h_relu1, h_relu2, h_relu3, h_relu4, h_relu5, h_relu6, h_relu7)
-
-        return out
+        return vgg_outputs(
+            h_relu1, h_relu2, h_relu3, h_relu4, h_relu5, h_relu6, h_relu7
+        )
 
 
 class alexnet(torch.nn.Module):
@@ -129,9 +129,7 @@ class alexnet(torch.nn.Module):
         alexnet_outputs = namedtuple(
             "AlexnetOutputs", ["relu1", "relu2", "relu3", "relu4", "relu5"]
         )
-        out = alexnet_outputs(h_relu1, h_relu2, h_relu3, h_relu4, h_relu5)
-
-        return out
+        return alexnet_outputs(h_relu1, h_relu2, h_relu3, h_relu4, h_relu5)
 
 
 class vgg16(torch.nn.Module):
@@ -173,9 +171,7 @@ class vgg16(torch.nn.Module):
             "VggOutputs",
             ["relu1_2", "relu2_2", "relu3_3", "relu4_3", "relu5_3"],
         )
-        out = vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3, h_relu5_3)
-
-        return out
+        return vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3, h_relu5_3)
 
 
 class resnet(torch.nn.Module):
@@ -218,9 +214,7 @@ class resnet(torch.nn.Module):
         h_conv5 = h
 
         outputs = namedtuple("Outputs", ["relu1", "conv2", "conv3", "conv4", "conv5"])
-        out = outputs(h_relu1, h_conv2, h_conv3, h_conv4, h_conv5)
-
-        return out
+        return outputs(h_relu1, h_conv2, h_conv3, h_conv4, h_conv5)
 
 
 # Off-the-shelf deep network
@@ -269,17 +263,11 @@ class PNet(torch.nn.Module):
             all_scores = []
         for kk, out0 in enumerate(outs0):
             cur_score = 1.0 - cos_sim(outs0[kk], outs1[kk])
-            if kk == 0:
-                val = 1.0 * cur_score
-            else:
-                val = val + cur_score
+            val = 1.0 * cur_score if kk == 0 else val + cur_score
             if retPerLayer:
                 all_scores += [cur_score]
 
-        if retPerLayer:
-            return (val, all_scores)
-        else:
-            return val
+        return (val, all_scores) if retPerLayer else val
 
 
 # The SSIM metric
@@ -290,33 +278,27 @@ def ssim_metric(img1, img2, mask=None):
 # The PSNR metric
 def psnr(img1, img2, mask=None, reshape=False):
     b = img1.size(0)
-    if not (mask is None):
+    if mask is not None:
         b = img1.size(0)
         mse_err = (img1 - img2).pow(2) * mask
-        if reshape:
-            mse_err = mse_err.reshape(b, -1).sum(dim=1) / (
-                3 * mask.reshape(b, -1).sum(dim=1).clamp(min=1)
-            )
-        else:
-            mse_err = mse_err.view(b, -1).sum(dim=1) / (
-                3 * mask.view(b, -1).sum(dim=1).clamp(min=1)
-            )
+        mse_err = (
+            mse_err.reshape(b, -1).sum(dim=1)
+            / (3 * mask.reshape(b, -1).sum(dim=1).clamp(min=1))
+            if reshape
+            else mse_err.view(b, -1).sum(dim=1)
+            / (3 * mask.view(b, -1).sum(dim=1).clamp(min=1))
+        )
+    elif reshape:
+        mse_err = (img1 - img2).pow(2).reshape(b, -1).mean(dim=1)
     else:
-        if reshape:
-            mse_err = (img1 - img2).pow(2).reshape(b, -1).mean(dim=1)
-        else:
-            mse_err = (img1 - img2).pow(2).view(b, -1).mean(dim=1)
+        mse_err = (img1 - img2).pow(2).view(b, -1).mean(dim=1)
 
-    psnr = 10 * (1 / mse_err).log10()
-    return psnr
+    return 10 * (1 / mse_err).log10()
 
 
 # The perceptual similarity metric
 def perceptual_sim(img1, img2, vgg16):
-    # First extract features
-    dist = vgg16(img1 * 2 - 1, img2 * 2 - 1)
-
-    return dist
+    return vgg16(img1 * 2 - 1, img2 * 2 - 1)
 
 
 def load_img(img_name, size=None):
@@ -331,7 +313,7 @@ def load_img(img_name, size=None):
         img = transform(img).cuda()
         img = img.unsqueeze(0)
     except Exception as e:
-        print("Failed at loading %s " % img_name)
+        print(f"Failed at loading {img_name} ")
         print(e)
         img = torch.zeros(1, 3, 256, 256).cuda()
         raise
@@ -436,13 +418,12 @@ def compute_perceptual_similarity_from_list(
         values_ssim += [ssim_sim]
         if psnr_sim != np.float("inf"):
             values_psnr += [psnr_sim]
+        elif torch.allclose(p_img, t_img):
+            equal_count += 1
+            print(f"{equal_count} equal src and wrp images.")
         else:
-            if torch.allclose(p_img, t_img):
-                equal_count += 1
-                print("{} equal src and wrp images.".format(equal_count))
-            else:
-                ambig_count += 1
-                print("{} ambiguous src and wrp images.".format(ambig_count))
+            ambig_count += 1
+            print(f"{ambig_count} ambiguous src and wrp images.")
 
     if take_every_other:
         n_valuespercsim = []
@@ -507,9 +488,9 @@ def compute_perceptual_similarity_from_list_topk(
         perc_sim = 10000
         ssim_sim = -10
         psnr_sim = -10
-        sample_percsim = list()
-        sample_ssim = list()
-        sample_psnr = list()
+        sample_percsim = []
+        sample_ssim = []
+        sample_psnr = []
         for p_img in pred_imgs:
             if resize:
                 t_img = load_img(tgt_imgs[0], size=(256, 256))
@@ -595,12 +576,10 @@ if __name__ == "__main__":
         folder, pred_img, tgt_img, opts.take_every_other
     )
 
-    f = open(opts.output_file, "w")
-    for key in results:
-        print("%s for %s: \n" % (key, opts.folder))
-        print("\t {:0.4f} | {:0.4f} \n".format(results[key][0], results[key][1]))
+    with open(opts.output_file, "w") as f:
+        for key in results:
+            print("%s for %s: \n" % (key, opts.folder))
+            print("\t {:0.4f} | {:0.4f} \n".format(results[key][0], results[key][1]))
 
-        f.write("%s for %s: \n" % (key, opts.folder))
-        f.write("\t {:0.4f} | {:0.4f} \n".format(results[key][0], results[key][1]))
-
-    f.close()
+            f.write("%s for %s: \n" % (key, opts.folder))
+            f.write("\t {:0.4f} | {:0.4f} \n".format(results[key][0], results[key][1]))

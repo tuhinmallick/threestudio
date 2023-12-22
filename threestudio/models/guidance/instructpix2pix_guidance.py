@@ -46,7 +46,7 @@ class InstructPix2PixGuidance(BaseObject):
     cfg: Config
 
     def configure(self) -> None:
-        threestudio.info(f"Loading InstructPix2Pix ...")
+        threestudio.info("Loading InstructPix2Pix ...")
 
         self.weights_dtype = (
             torch.float16 if self.cfg.half_precision_weights else torch.float32
@@ -110,7 +110,7 @@ class InstructPix2PixGuidance(BaseObject):
 
         self.grad_clip_val: Optional[float] = None
 
-        threestudio.info(f"Loaded InstructPix2Pix!")
+        threestudio.info("Loaded InstructPix2Pix!")
 
     @torch.cuda.amp.autocast(enabled=False)
     def set_min_max_steps(self, min_step_percent=0.02, max_step_percent=0.98):
@@ -158,7 +158,7 @@ class InstructPix2PixGuidance(BaseObject):
         self, latents: Float[Tensor, "B 4 DH DW"]
     ) -> Float[Tensor, "B 3 H W"]:
         input_dtype = latents.dtype
-        latents = 1 / self.vae.config.scaling_factor * latents
+        latents *= 1 / self.vae.config.scaling_factor
         image = self.vae.decode(latents.to(self.weights_dtype)).sample
         image = (image * 0.5 + 0.5).clamp(0, 1)
         return image.to(input_dtype)
@@ -178,7 +178,7 @@ class InstructPix2PixGuidance(BaseObject):
             latents = self.scheduler.add_noise(latents, noise, t)  # type: ignore
             threestudio.debug("Start editing...")
             # sections of code used from https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/stable_diffusion/pipeline_stable_diffusion_instruct_pix2pix.py
-            for i, t in enumerate(self.scheduler.timesteps):
+            for t in self.scheduler.timesteps:
                 # predict the noise residual with unet, NO grad!
                 with torch.no_grad():
                     # pred noise
@@ -235,8 +235,7 @@ class InstructPix2PixGuidance(BaseObject):
         )
 
         w = (1 - self.alphas[t]).view(-1, 1, 1, 1)
-        grad = w * (noise_pred - noise)
-        return grad
+        return w * (noise_pred - noise)
 
     def __call__(
         self,

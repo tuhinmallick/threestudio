@@ -47,16 +47,15 @@ class Mesh:
         components = mesh.split(only_watertight=False)
         # log the number of faces in each component
         threestudio.debug(
-            "Mesh has {} components, with faces: {}".format(
-                len(components), [c.faces.shape[0] for c in components]
-            )
+            f"Mesh has {len(components)} components, with faces: {[c.faces.shape[0] for c in components]}"
         )
 
         n_faces_threshold: int
         if isinstance(outlier_n_faces_threshold, float):
             # set the threshold to the number of faces in the largest component multiplied by outlier_n_faces_threshold
             n_faces_threshold = int(
-                max([c.faces.shape[0] for c in components]) * outlier_n_faces_threshold
+                max(c.faces.shape[0] for c in components)
+                * outlier_n_faces_threshold
             )
         else:
             # set the threshold directly to outlier_n_faces_threshold
@@ -64,7 +63,7 @@ class Mesh:
 
         # log the threshold
         threestudio.debug(
-            "Removing components with less than {} faces".format(n_faces_threshold)
+            f"Removing components with less than {n_faces_threshold} faces"
         )
 
         # remove the components with less than n_face_threshold faces
@@ -72,9 +71,7 @@ class Mesh:
 
         # log the number of faces in each component after removing outliers
         threestudio.debug(
-            "Mesh has {} components after removing outliers, with faces: {}".format(
-                len(components), [c.faces.shape[0] for c in components]
-            )
+            f"Mesh has {len(components)} components after removing outliers, with faces: {[c.faces.shape[0] for c in components]}"
         )
         # merge the components
         mesh = trimesh.util.concatenate(components)
@@ -268,10 +265,9 @@ class Mesh:
 
     def normal_consistency(self) -> Float[Tensor, ""]:
         edge_nrm: Float[Tensor, "Ne 2 3"] = self.v_nrm[self.edges]
-        nc = (
+        return (
             1.0 - torch.cosine_similarity(edge_nrm[:, 0], edge_nrm[:, 1], dim=-1)
         ).mean()
-        return nc
 
     def _laplacian_uniform(self):
         # from stable-dreamfusion

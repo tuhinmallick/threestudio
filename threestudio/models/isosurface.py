@@ -240,7 +240,7 @@ class MarchingTetrahedraHelper(IsosurfaceHelper):
 
         v_pos, t_pos_idx = self._forward(grid_vertices, level, self.indices)
 
-        mesh = Mesh(
+        return Mesh(
             v_pos=v_pos,
             t_pos_idx=t_pos_idx,
             # extras
@@ -249,5 +249,3 @@ class MarchingTetrahedraHelper(IsosurfaceHelper):
             grid_level=level,
             grid_deformation=deformation,
         )
-
-        return mesh

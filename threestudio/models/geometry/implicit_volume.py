@@ -132,13 +132,13 @@ class ImplicitVolume(BaseImplicitGeometry):
             features = self.feature_network(enc).view(
                 *points.shape[:-1], self.cfg.n_feature_dims
             )
-            output.update({"features": features})
+            output["features"] = features
 
         if output_normal:
-            if (
-                self.cfg.normal_type == "finite_difference"
-                or self.cfg.normal_type == "finite_difference_laplacian"
-            ):
+            if self.cfg.normal_type in [
+                "finite_difference",
+                "finite_difference_laplacian",
+            ]:
                 # TODO: use raw density
                 eps = self.cfg.finite_difference_normal_eps
                 if self.cfg.normal_type == "finite_difference_laplacian":
@@ -231,11 +231,7 @@ class ImplicitVolume(BaseImplicitGeometry):
         features = self.feature_network(enc).view(
             *points.shape[:-1], self.cfg.n_feature_dims
         )
-        out.update(
-            {
-                "features": features,
-            }
-        )
+        out["features"] = features
         return out
 
     @staticmethod
@@ -246,30 +242,29 @@ class ImplicitVolume(BaseImplicitGeometry):
         copy_net: bool = True,
         **kwargs,
     ) -> "ImplicitVolume":
-        if isinstance(other, ImplicitVolume):
-            instance = ImplicitVolume(cfg, **kwargs)
-            instance.encoding.load_state_dict(other.encoding.state_dict())
-            instance.density_network.load_state_dict(other.density_network.state_dict())
-            if copy_net:
-                if (
-                    instance.cfg.n_feature_dims > 0
-                    and other.cfg.n_feature_dims == instance.cfg.n_feature_dims
-                ):
-                    instance.feature_network.load_state_dict(
-                        other.feature_network.state_dict()
-                    )
-                if (
-                    instance.cfg.normal_type == "pred"
-                    and other.cfg.normal_type == "pred"
-                ):
-                    instance.normal_network.load_state_dict(
-                        other.normal_network.state_dict()
-                    )
-            return instance
-        else:
+        if not isinstance(other, ImplicitVolume):
             raise TypeError(
                 f"Cannot create {ImplicitVolume.__name__} from {other.__class__.__name__}"
             )
+        instance = ImplicitVolume(cfg, **kwargs)
+        instance.encoding.load_state_dict(other.encoding.state_dict())
+        instance.density_network.load_state_dict(other.density_network.state_dict())
+        if copy_net:
+            if (
+                instance.cfg.n_feature_dims > 0
+                and other.cfg.n_feature_dims == instance.cfg.n_feature_dims
+            ):
+                instance.feature_network.load_state_dict(
+                    other.feature_network.state_dict()
+                )
+            if (
+                instance.cfg.normal_type == "pred"
+                and other.cfg.normal_type == "pred"
+            ):
+                instance.normal_network.load_state_dict(
+                    other.normal_network.state_dict()
+                )
+        return instance
 
     def update_step(
         self, epoch: int, global_step: int, on_load_weights: bool = False

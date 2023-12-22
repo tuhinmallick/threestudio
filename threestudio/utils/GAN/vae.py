@@ -129,11 +129,7 @@ class ResnetBlock(nn.Module):
         h = self.conv2(h)
 
         if self.in_channels != self.out_channels:
-            if self.use_conv_shortcut:
-                x = self.conv_shortcut(x)
-            else:
-                x = self.nin_shortcut(x)
-
+            x = self.conv_shortcut(x) if self.use_conv_shortcut else self.nin_shortcut(x)
         return x + h
 
 
@@ -252,7 +248,7 @@ class Model(nn.Module):
             attn = nn.ModuleList()
             block_in = ch * in_ch_mult[i_level]
             block_out = ch * ch_mult[i_level]
-            for i_block in range(self.num_res_blocks):
+            for _ in range(self.num_res_blocks):
                 block.append(
                     ResnetBlock(
                         in_channels=block_in,
@@ -420,7 +416,7 @@ class Encoder(nn.Module):
             attn = nn.ModuleList()
             block_in = ch * in_ch_mult[i_level]
             block_out = ch * ch_mult[i_level]
-            for i_block in range(self.num_res_blocks):
+            for _ in range(self.num_res_blocks):
                 block.append(
                     ResnetBlock(
                         in_channels=block_in,
@@ -537,9 +533,7 @@ class Decoder(nn.Module):
         curr_res = resolution // 2 ** (self.num_resolutions - 1)
         self.z_shape = (1, z_channels, curr_res, curr_res)
         print(
-            "Working with z of shape {} = {} dimensions.".format(
-                self.z_shape, np.prod(self.z_shape)
-            )
+            f"Working with z of shape {self.z_shape} = {np.prod(self.z_shape)} dimensions."
         )
 
         # z to block_in
@@ -573,7 +567,7 @@ class Decoder(nn.Module):
             block = nn.ModuleList()
             attn = nn.ModuleList()
             block_out = ch * ch_mult[i_level]
-            for i_block in range(self.num_res_blocks + 1):
+            for _ in range(self.num_res_blocks + 1):
                 block.append(
                     ResnetBlock(
                         in_channels=block_in,
@@ -614,11 +608,7 @@ class Decoder(nn.Module):
 
         # z to block_in
         rgb = z[:, :3]
-        if z.shape[1] == self.z_shape[1] + 3:
-            h = self.conv_in3(z)
-        else:
-            h = self.conv_in(z)
-
+        h = self.conv_in3(z) if z.shape[1] == self.z_shape[1] + 3 else self.conv_in(z)
         # middle
         # h = self.mid.block_1(h, temb)
         # h = self.mid.block_2(h, temb)
@@ -681,11 +671,7 @@ class SimpleDecoder(nn.Module):
 
     def forward(self, x):
         for i, layer in enumerate(self.model):
-            if i in [1, 2, 3]:
-                x = layer(x, None)
-            else:
-                x = layer(x)
-
+            x = layer(x, None) if i in [1, 2, 3] else layer(x)
         h = self.norm_out(x)
         h = nonlinearity(h)
         x = self.conv_out(h)
@@ -715,7 +701,7 @@ class UpsampleDecoder(nn.Module):
         for i_level in range(self.num_resolutions):
             res_block = []
             block_out = ch * ch_mult[i_level]
-            for i_block in range(self.num_res_blocks + 1):
+            for _ in range(self.num_res_blocks + 1):
                 res_block.append(
                     ResnetBlock(
                         in_channels=block_in,
@@ -935,11 +921,6 @@ class Resize(nn.Module):
                 f"Note: {self.__class__.__name} uses learned downsampling and will ignore the fixed {mode} mode"
             )
             raise NotImplementedError()
-            assert in_channels is not None
-            # no asymmetric padding in torch conv, must do it ourselves
-            self.conv = torch.nn.Conv2d(
-                in_channels, in_channels, kernel_size=4, stride=2, padding=1
-            )
 
     def forward(self, x, scale_factor=1.0):
         if scale_factor == 1.0:

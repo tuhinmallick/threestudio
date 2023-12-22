@@ -31,8 +31,7 @@ class TexturedBackground(BaseBackground):
         xy = (x**2 + y**2) ** 0.5
         u = torch.atan2(xy, z) / torch.pi
         v = torch.atan2(y, x) / (torch.pi * 2) + 0.5
-        uv = torch.stack([u, v], -1)
-        return uv
+        return torch.stack([u, v], -1)
 
     def forward(self, dirs: Float[Tensor, "*B 3"]) -> Float[Tensor, "*B Nc"]:
         dirs_shape = dirs.shape[:-1]

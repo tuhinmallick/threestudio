@@ -32,8 +32,8 @@ def md5_hash(path):
 def get_ckpt_path(name, root, check=False):
     assert name in URL_MAP
     path = os.path.join(root, CKPT_MAP[name])
-    if not os.path.exists(path) or (check and not md5_hash(path) == MD5_MAP[name]):
-        print("Downloading {} model from {} to {}".format(name, URL_MAP[name], path))
+    if not os.path.exists(path) or check and md5_hash(path) != MD5_MAP[name]:
+        print(f"Downloading {name} model from {URL_MAP[name]} to {path}")
         download(URL_MAP[name], path)
         md5 = md5_hash(path)
         assert md5 == MD5_MAP[name], md5
@@ -45,12 +45,12 @@ class KeyNotFoundError(Exception):
         self.cause = cause
         self.keys = keys
         self.visited = visited
-        messages = list()
+        messages = []
         if keys is not None:
-            messages.append("Key not found: {}".format(keys))
+            messages.append(f"Key not found: {keys}")
         if visited is not None:
-            messages.append("Visited: {}".format(visited))
-        messages.append("Cause:\n{}".format(cause))
+            messages.append(f"Visited: {visited}")
+        messages.append(f"Cause:\n{cause}")
         message = "\n".join(messages)
         super().__init__(message)
 
@@ -128,14 +128,10 @@ def retrieve(
     except KeyNotFoundError as e:
         if default is None:
             raise e
-        else:
-            list_or_dict = default
-            success = False
+        list_or_dict = default
+        success = False
 
-    if not pass_success:
-        return list_or_dict
-    else:
-        return list_or_dict, success
+    return list_or_dict if not pass_success else (list_or_dict, success)
 
 
 if __name__ == "__main__":
